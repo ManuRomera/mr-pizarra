@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MR- Pizarra · pizarra de investigación para Foundry VTT</title>
+<meta name="description" content="Pizarra de investigación colaborativa para cualquier sistema de Foundry VTT: corcho, hilos, fotos, recortes de periódico irregulares y tus diarios colgados con sus permisos.">
+<style>
+:root{--bg:#f4ecdd;--ink:#2b2218;--card:#fffaf0;--line:#d9c9a8;--accent:#a8352b}
+@media (prefers-color-scheme:dark){:root{--bg:#1d1812;--ink:#eadfc8;--card:#27201a;--line:#43382b;--accent:#e0705f}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.6 Georgia,"Times New Roman",serif}
+main{max-width:860px;margin:0 auto;padding:0 20px 60px}
+.hero img{display:block;width:100%;border-radius:0 0 14px 14px;box-shadow:0 8px 30px #0005}
+h1{font-size:2.2rem;margin:.9em 0 .1em}h2{margin-top:1.8em;border-bottom:1px solid var(--line);padding-bottom:.2em}
+.lead{font-size:1.15rem;opacity:.9}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin:16px 0}
+code{background:var(--card);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:.9em;word-break:break-all}
+table{border-collapse:collapse;width:100%}td,th{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+a{color:var(--accent)}.btn{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;padding:10px 18px;border-radius:9px;font-weight:700}
+.shot{width:100%;border-radius:10px;border:1px solid var(--line)}
+</style>
+</head>
+<body>
+<div class="hero"><img src="img/banner.webp" alt="Pizarra de corcho con fotos, recortes y hilos rojos"></div>
+<main>
+<h1>MR- Pizarra</h1>
+<p class="lead">Una pizarra de investigación colaborativa para <strong>cualquier sistema</strong> de Foundry VTT: corcho, hilos de colores, fotos, notas, recortes de periódico de formas irregulares y los documentos de tus propios diarios, colgados con sus permisos.</p>
+<p><a class="btn" href="https://github.com/ManuRomera/mr-pizarra/releases/latest">Descargar</a></p>
+
+<h2>Instalación</h2>
+<div class="card"><p>En Foundry: <em>Configuración → Módulos → Instalar módulo</em> y pega este manifiesto:</p>
+<p><code>https://github.com/ManuRomera/mr-pizarra/releases/latest/download/module.json</code></p>
+<p>Requiere Foundry VTT 13 o posterior. Después, en la pestaña Diarios, pulsa <em>Nueva pizarra</em>.</p></div>
+
+<img class="shot" src="img/preview.webp" alt="Pizarra de investigación llena de fotos, recortes y notas unidos con hilos de colores">
+
+<h2>Lo que ven los jugadores</h2>
+<table>
+<tr><th>Permiso sobre el documento</th><th>Qué aparece en la pizarra</th></tr>
+<tr><td>Observador o más</td><td>El contenido: el texto como recorte de periódico, las imágenes como foto.</td></tr>
+<tr><td>Limitado</td><td>Solo el título; el texto sale censurado con barras y un sello «RESERVADO».</td></tr>
+<tr><td>Ninguno</td><td>Un sobre con «?», sin nombre.</td></tr>
+</table>
+<p>Si subes el permiso del diario, la pieza se revela sola.</p>
+
+<h2>Qué incluye</h2>
+<ul>
+<li>Notas, recortes con 18 papeles y 14 contornos irregulares (cada recorte sale distinto), fotos con 6 marcos, sellos, marcas de rotulador, huellas y manchas.</li>
+<li>Hilos de 6 colores y 3 estilos, con etiqueta.</li>
+<li>20 fondos: corcho, victoriano, casa maldita, Oeste, sala de guerra, ciberpunk, nave espacial…</li>
+<li>Piezas ocultas hasta que las reveles, piezas privadas y bloqueo en solo lectura.</li>
+<li>Trabajo en común sin pisarse, con las piezas moviéndose en directo.</li>
+</ul>
+
+<h2>Límites</h2>
+<p>Las piezas ocultas o privadas se filtran en el cliente: no cuelgues secretos reales que un jugador pueda leer con la consola. Quien no sea Propietario del diario guarda sus cambios a través de la Guardiana, que debe estar conectada.</p>
+<p><a href="https://github.com/ManuRomera/mr-pizarra">Código y documentación en GitHub</a> · Licencia MIT</p>
+</main>
+</body>
+</html>

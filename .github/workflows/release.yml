@@ -16,10 +16,9 @@ jobs:
         run: test "v$(node -p "require('./module.json').version")" = "$GITHUB_REF_NAME"
       - run: npm test
       - run: for f in scripts/*.mjs; do node --check "$f"; done
-      - name: Empaquetar
+      - name: Empaquetar (mismo script que en local)
         run: |
-          mkdir -p dist
-          zip -r dist/mr-pizarra.zip module.json scripts styles lang assets LICENSE README.md CHANGELOG.md
+          npm run zip
           cp module.json dist/module.json
       - name: Notas de la versión
         run: |
