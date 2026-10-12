@@ -1,5 +1,16 @@
 # Cambios
 
+## 0.3.0 · Edición directa, sujeciones a tu gusto y accesibilidad
+
+- **Escribir sobre la pieza:** doble clic y escribes directamente en notas, titulares, cuerpos, pies de foto y sellos (Intro o clic fuera confirma, Esc cancela). Las piezas nuevas nacen ya listas para escribir. La ventana completa queda para «Editar detalles…».
+- **Desplegables en el dock:** cada herramienta abre un panel con las variantes de su tipo (colores de nota, 16 papeles, marcos, sellos, marcas) y **Aleatorio**. Elegir una crea la pieza al momento. «Colgar documento» es una lista con buscador.
+- **Sujeción por defecto** (barra superior): tipo (chinchetas, celo, clip, grapa o automático), **color a tu elección** (el celo y las chinchetas se tiñen) y **colocación** (centro, dos esquinas, cuatro esquinas, una esquina, abajo, arriba y abajo, laterales). Vale para todas las piezas, y cada pieza o selección puede tener la suya desde la barra de selección.
+- **Chinchetas de tamaño fijo**; el celo se adapta algo a la pieza. Las sujeciones siguen el borde rasgado del papel y el texto se aparta de ellas.
+- **Texto legible:** los papeles de periódico traían un titular y un texto fantasma impresos que pisaban el tuyo; ahora son papel limpio. El titular ya no sale casi blanco, una columna salvo textos largos, sin justificar, y la letra se ajusta cuando el papel ya está en pantalla.
+- **Fotos sin imagen:** se crean al instante y se rellenan con el selector de archivos (doble clic).
+- **Accesibilidad** (botón de la barra superior, se guarda en tu navegador): tamaño de texto del 80 al 200 %, letra legible, alto contraste, reducir movimiento e interfaz grande. Además, anuncios para lectores de pantalla, Tab recorre las piezas, flechas para moverlas, Intro para editar y atributos ARIA en herramientas y piezas.
+- **Fondos:** el pergamino es ahora un pergamino continuo propio. Se retira el mapa antiguo: la imagen original solo tiene 1024 px reales y no aguanta un lienzo grande.
+
 ## 0.2.0 · Selección múltiple, giro y una interfaz nueva
 
 - **Selección múltiple:** clic con Mayús/Ctrl, recuadro arrastrando en vacío y Ctrl/Cmd+A.

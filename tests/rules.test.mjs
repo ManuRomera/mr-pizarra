@@ -96,13 +96,33 @@ test("apariencia: determinista por id y distinta entre piezas", () => {
   const masks = new Set(Array.from({ length: 40 }, (_, i) => look(`pieza${i}xxxxxxxxxxx`, item).mask));
   assert.ok(masks.size >= 5, `solo ${masks.size} máscaras distintas`);
   assert.ok([...masks].every((m) => AUTO_MASKS.includes(m)));
-  const p = look("zzzzzzzzzzzzzzzz", { type: "photo" });
-  assert.ok(p.pinFx < 0.2 || p.pinFx > 0.8, "las fotos llevan el adorno en una esquina");
-  assert.equal(look(ID1, { type: "clipping" }).pinFx, 0.5);
+  assert.equal(look("zzzzzzzzzzzzzzzz", { type: "photo" }).pins.length, 2, "las fotos llevan dos sujeciones en las esquinas");
+  assert.equal(look(ID1, { type: "clipping" }).pins.length, 1);
+  assert.equal(look(ID1, { type: "clipping" }).pins[0].x, 0.5);
   assert.equal(look(ID1, { type: "clipping", mask: "none", pin: "none", rot: 3 }).rot, 3);
   assert.equal(look(ID1, { type: "photo" }).mask, "none");
+  assert.equal(look(ID1, { type: "clipping", pin: "none" }).pins.length, 0);
   const r = rng("x");
   assert.notEqual(r(), r());
+});
+
+test("sujeción: la pizarra la fija y cada pieza puede cambiarla", () => {
+  const preset = { pin: "cinta-washi-rojo", color: "#2c6fbb", layout: "fourCorners" };
+  const l = look(ID1, { type: "note" }, preset);
+  assert.equal(l.pins.length, 4);
+  assert.ok(l.pins.every((p) => p.pin === "cinta-washi-rojo"));
+  assert.equal(l.color, "#2c6fbb");
+  const own = look(ID1, { type: "note", pin: "grapa", pinLayout: "top", pinColor: "orig" }, preset);
+  assert.deepEqual([own.pins.length, own.pins[0].pin, own.color], [1, "grapa", ""]);
+  assert.equal(planOps({}, [op(ID1, { pinPreset: preset }, "settings")], PL).board.pinPreset.layout, "fourCorners");
+  assert.throws(() => planOps({}, [op(ID1, { pinPreset: { ...preset, color: "rojo" } }, "settings")], PL), /Color/);
+  assert.throws(() => planOps({}, [op(ID1, { pinPreset: { ...preset, layout: "x" } }, "settings")], PL), /Colocación/);
+  assert.throws(() => planOps({}, [op(ID1, { type: "note", pinLayout: "x" })], PL), /Colocación/);
+});
+
+test("fotos: se pueden crear sin imagen y rellenarla después", () => {
+  assert.equal(planOps({}, [op(ID1, { type: "photo", src: "" })], PL).board.items[ID1].src, "");
+  assert.throws(() => planOps({}, [op(ID1, { type: "photo", src: "no-imagen" })], PL), /Imagen/);
 });
 
 test("catálogo: ids únicos y cada imagen existe en assets (si ya se generaron)", () => {
@@ -112,5 +132,5 @@ test("catálogo: ids únicos y cada imagen existe en assets (si ya se generaron)
   const m = JSON.parse(readFileSync(manifest, "utf8"));
   for (const t of Object.values(TABLES)) for (const e of t.values()) assert.ok(m[`${e.folder}/${e.id}`], `falta ${e.folder}/${e.id}`);
   for (const id of AUTO_MASKS) assert.ok(m[`bordes/${id}`].safe, `falta la zona segura de ${id}`);
-  for (const b of BACKGROUNDS) assert.ok(m[`fondos/${b.id}`].mode === "cover" || b.size > 0, `falta el tamaño de ${b.id}`);
+  for (const b of BACKGROUNDS) assert.ok(b.size > 0, `falta el tamaño de ${b.id}`);
 });

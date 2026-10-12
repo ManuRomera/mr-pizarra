@@ -26,8 +26,7 @@ export const BACKGROUNDS = Object.freeze([
     ["papel-victoriano-verde", "Salón victoriano", { group: "Época", size: 1000 }],
     ["empapelado-hotel-art-deco", "Hotel art déco", { group: "Época", size: 1100 }],
     ["papel-pintado-lovecraft", "Casa maldita", { group: "Época", size: 1000 }],
-    ["mapa-antiguo-mundo", "Mapa antiguo", { group: "Época", size: 0 }],
-    ["pergamino-nautico", "Carta náutica", { group: "Época", size: 0 }],
+    ["pergamino-nautico", "Carta náutica", { group: "Época", size: 1024 }],
     ["piedra-medieval", "Muro medieval", { group: "Época", size: 1100 }],
     ["madera-oeste", "Tablones del Oeste", { group: "Época", size: 1200 }],
     ["papel-washi-oriental", "Papel washi", { group: "Época", size: 900 }],
@@ -134,6 +133,27 @@ export const ITEM_TYPES = Object.freeze(["note", "clipping", "photo", "journal",
 /** Anchura por defecto de cada tipo (la altura sale de la proporción de la imagen). */
 export const DEFAULT_WIDTH = Object.freeze({ note: 190, clipping: 280, photo: 230, journal: 270, entity: 210, stamp: 230, mark: 170 });
 
+/**
+ * Dónde se sujeta una pieza. `x`,`y` son fracciones de su ancho y alto (0 arriba/izquierda); `c` indica la esquina
+ * (−1 izquierda, 1 derecha) para girar el celo en diagonal. Un celo, una chincheta o un clip siguen el borde rasgado.
+ */
+export const PIN_LAYOUTS = Object.freeze({
+  top: { name: "Centro arriba", pins: [{ x: 0.5, y: 0 }] },
+  topCorners: { name: "Dos esquinas de arriba", pins: [{ x: 0.1, y: 0, c: -1 }, { x: 0.9, y: 0, c: 1 }] },
+  fourCorners: { name: "Cuatro esquinas", pins: [{ x: 0.1, y: 0, c: -1 }, { x: 0.9, y: 0, c: 1 }, { x: 0.1, y: 1, c: 1 }, { x: 0.9, y: 1, c: -1 }] },
+  topLeft: { name: "Esquina izquierda", pins: [{ x: 0.1, y: 0, c: -1 }] },
+  topRight: { name: "Esquina derecha", pins: [{ x: 0.9, y: 0, c: 1 }] },
+  bottom: { name: "Centro abajo", pins: [{ x: 0.5, y: 1 }] },
+  topBottom: { name: "Arriba y abajo", pins: [{ x: 0.5, y: 0 }, { x: 0.5, y: 1 }] },
+  sides: { name: "Laterales", pins: [{ x: 0, y: 0.5, s: -1 }, { x: 1, y: 0.5, s: 1 }] },
+});
+export const LAYOUT_IDS = Object.freeze(Object.keys(PIN_LAYOUTS));
+/** Colocación por tipo cuando está en «auto». */
+const AUTO_LAYOUT = Object.freeze({ note: "top", clipping: "top", photo: "topCorners", journal: "top", entity: "topCorners" });
+/** Sujeción por defecto de una pizarra nueva. */
+export const DEFAULT_PIN_PRESET = Object.freeze({ pin: "auto", color: "", layout: "auto" });
+const HEX = /^#[0-9a-fA-F]{6}$/;
+
 const byId = (table) => new Map(table.map((entry) => [entry.id, entry]));
 export const TABLES = Object.freeze({ paper: byId(PAPERS), mask: byId(MASKS), frame: byId(FRAMES), pin: byId(PINS), stamp: byId(STAMPS), mark: byId(MARKS), background: byId(BACKGROUNDS) });
 
@@ -164,28 +184,34 @@ const AUTO_PINS = Object.freeze({
   entity: ["chincheta-roja", "chincheta-azul"],
 });
 
-/** Giro, máscara y adorno de una pieza, resueltos desde su id cuando están en «auto». */
-export function look(id, item) {
+/**
+ * Giro, contorno y sujeciones de una pieza, resueltos desde su id cuando están en «auto» y desde la sujeción por defecto
+ * de la pizarra (`preset`). Devuelve `pins`: una entrada por adorno con su posición relativa (x,y), giro y color.
+ */
+export function look(id, item, preset = DEFAULT_PIN_PRESET) {
   const random = rng(`${id}:${item.type}`);
+  const jitter = (n) => Math.round((random() * 2 - 1) * n);
   const rot = Number.isFinite(item.rot) ? item.rot : Math.round((random() * 2 - 1) * 5 * 10) / 10;
   let mask = item.mask ?? "auto";
   if (mask === "auto") mask = ["clipping", "journal"].includes(item.type) ? pick(random, MASKS.filter((m) => AUTO_MASKS.includes(m.id))).id : "none";
+  const skew = jitter(12) / 10;
   let pin = item.pin ?? "auto";
-  if (pin === "auto") pin = AUTO_PINS[item.type] ? pick(random, AUTO_PINS[item.type]) : "none";
-  // Posición del adorno: en el centro del borde superior o, en fotos y fichas, en una esquina (no tapa la imagen).
+  if (pin === "auto") pin = preset.pin && preset.pin !== "auto" ? preset.pin : AUTO_PINS[item.type] ? pick(random, AUTO_PINS[item.type]) : "none";
+  let layoutId = item.pinLayout ?? "auto";
+  if (layoutId === "auto") layoutId = preset.layout && preset.layout !== "auto" ? preset.layout : (AUTO_LAYOUT[item.type] ?? "top");
+  const layout = PIN_LAYOUTS[layoutId] ?? PIN_LAYOUTS.top;
+  let color = item.pinColor ?? "";
+  if (color === "") color = preset.color ?? "";
   const kind = TABLES.pin.get(pin)?.kind;
-  const corner = ["photo", "entity"].includes(item.type);
-  const side = random() < 0.5 ? -1 : 1;
-  const jitter = (n) => Math.round((random() * 2 - 1) * n);
-  return {
-    rot,
-    mask,
-    pin,
-    pinFx: corner ? (side < 0 ? 0.13 : 0.87) : 0.5,
-    pinX: jitter(corner ? 5 : 14),
-    pinRot: corner && kind === "cinta" ? side * (36 + Math.abs(jitter(10))) : jitter(kind === "chincheta" ? 6 : 12),
-    skew: jitter(12) / 10,
-  };
+  const pins = kind
+    ? layout.pins.map((spot, i) => {
+        const r = rng(`${id}:pin${i}`);
+        const j = (n) => Math.round((r() * 2 - 1) * n);
+        const base = kind === "cinta" ? (spot.c ? spot.c * (38 + Math.abs(j(8))) : spot.s ? 90 + j(10) : j(10)) : j(kind === "chincheta" ? 8 : 12);
+        return { pin, x: spot.x, y: spot.y, rot: base, dx: spot.c || spot.s ? 0 : j(14), c: spot.c ?? 0, s: spot.s ?? 0 };
+      })
+    : [];
+  return { rot, mask, skew, pins, color: color === "orig" ? "" : color, layout: layoutId };
 }
 
 /* ---------------------------------- Validación ---------------------------------- */
@@ -206,13 +232,18 @@ const requireId = (id) => {
 
 const ratio = (v) => Math.round(Math.min(2.2, Math.max(0.25, Number(v))) * 100) / 100;
 const AUTO = (table) => (value, what) => (value === "auto" ? value : oneOf(value, table, what));
+const LAYOUT = (v) => (v === "auto" || PIN_LAYOUTS[v] ? v : (() => { throw Error("Colocación desconocida."); })());
+const PINCOLOR = (v) => (v === "" || v === "orig" || HEX.test(v) ? v : (() => { throw Error("Color de sujeción no válido."); })());
 const NONE = (table) => (value, what) => (value === "none" || value === "auto" ? value : oneOf(value, table, what));
 /** Campos propios de cada tipo → validador. */
 const FIELDS = {
-  note: { text: (v) => clean(v, BOARD.textMax), color: (v) => (NOTE_COLORS.includes(v) ? v : (() => { throw Error("Color de nota desconocido."); })()), pin: NONE(TABLES.pin) },
-  clipping: { ratio, title: (v) => clean(v, BOARD.titleMax), text: (v) => clean(v, BOARD.textMax), paper: (v) => oneOf(v, TABLES.paper, "Papel"), mask: NONE(TABLES.mask), pin: NONE(TABLES.pin) },
+  note: { pinLayout: LAYOUT, pinColor: PINCOLOR, text: (v) => clean(v, BOARD.textMax), color: (v) => (NOTE_COLORS.includes(v) ? v : (() => { throw Error("Color de nota desconocido."); })()), pin: NONE(TABLES.pin) },
+  clipping: { pinLayout: LAYOUT, pinColor: PINCOLOR, ratio, title: (v) => clean(v, BOARD.titleMax), text: (v) => clean(v, BOARD.textMax), paper: (v) => oneOf(v, TABLES.paper, "Papel"), mask: NONE(TABLES.mask), pin: NONE(TABLES.pin) },
   photo: {
+    pinLayout: LAYOUT,
+    pinColor: PINCOLOR,
     src: (v) => {
+      if (v === "") return ""; // foto sin imagen todavía
       if (!IMAGE.test(String(v)) || String(v).includes("..")) throw Error("Imagen no permitida.");
       return String(v);
     },
@@ -220,8 +251,8 @@ const FIELDS = {
     frame: (v) => oneOf(v, TABLES.frame, "Marco"),
     pin: NONE(TABLES.pin),
   },
-  journal: { ratio, pin: NONE(TABLES.pin), mask: NONE(TABLES.mask) },
-  entity: { pin: NONE(TABLES.pin), frame: (v) => oneOf(v, TABLES.frame, "Marco") },
+  journal: { pinLayout: LAYOUT, pinColor: PINCOLOR, ratio, pin: NONE(TABLES.pin), mask: NONE(TABLES.mask) },
+  entity: { pinLayout: LAYOUT, pinColor: PINCOLOR, pin: NONE(TABLES.pin), frame: (v) => oneOf(v, TABLES.frame, "Marco") },
   stamp: { kind: (v) => oneOf(v, TABLES.stamp, "Sello"), text: (v) => clean(v, BOARD.labelMax) },
   mark: { kind: (v) => oneOf(v, TABLES.mark, "Marca") },
 };
@@ -346,6 +377,14 @@ export function planOps(board, ops, ctx) {
       if ("locked" in (raw.data ?? {})) {
         if (!ctx.isGM) throw Error("Solo la Guardiana puede bloquear la pizarra.");
         data.locked = Boolean(raw.data.locked);
+      }
+      if ("pinPreset" in (raw.data ?? {})) {
+        const p = raw.data.pinPreset ?? {};
+        data.pinPreset = {
+          pin: p.pin === "auto" || p.pin === "none" ? p.pin : oneOf(p.pin, TABLES.pin, "Sujeción"),
+          color: p.color === "" ? "" : PINCOLOR(p.color),
+          layout: LAYOUT(p.layout),
+        };
       }
       Object.assign(work, data);
       for (const [key, value] of Object.entries(data)) update[`${FLAG}.${key}`] = value;

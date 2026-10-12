@@ -15,6 +15,14 @@ Módulo de Foundry VTT (v13+, probado en 13.351) independiente del sistema. Id `
 - Historial: `#commit` calcula la inversa (`#inverse`) antes de enviar: valores anteriores, lo creado se quita y lo quitado vuelve **con sus hilos, piezas antes que hilos**. Un campo que la pieza no tenía guardado (`w`, `rot`, `hidden`, `owner`) se restaura con su valor efectivo.
 - `requestAnimationFrame` se pausa con la pestaña en segundo plano: lo esencial (hilos, selección, barra) se pinta de forma síncrona; solo el minimapa va por rAF.
 
+## Sujeciones, texto y accesibilidad
+- `look(id, item, preset)` (rules.mjs) devuelve `pins[]` ya resueltos desde la pieza y la sujeción por defecto de la pizarra (`board.pinPreset`); `PIN_LAYOUTS` define las colocaciones. `items.mjs` las coloca sobre el **borde real** del contorno (`manifest.edge`: perfiles arriba/abajo/izquierda/derecha) y calcula el hueco que reservan para el texto: los centrados reservan entero, los de esquina solo una franja.
+- Tamaño fijo de chinchetas/clips/grapas; el color se tiñe con una capa `mix-blend-mode: color` + máscara sobre la imagen en grises (la URL de la máscara en una variable CSS va **absoluta** con `foundry.utils.getRoute`).
+- Edición directa: `contenteditable="plaintext-only"` sobre los `[data-field]`; se guarda con `textContent` (nunca `innerText`: aplica `text-transform`).
+- `fitText` solo mide con la ventana en pantalla: se llama en `_onRender` y en el primer `ResizeObserver` (`#fitAll`). El texto de sellos y pies se escala con `--fit`, el resto con `em`.
+- Accesibilidad: ajuste de cliente `a11y` (clases `mrp-legible`, `mrp-hc`, `mrp-calm`, `mrp-bigui`, variable `--tscale`). `zoom` CSS en la interfaz grande obliga a dividir posiciones por el zoom (`#place`).
+- Fondos: los del generador están reflejados en espejo. El mapa antiguo se retiró (sin resolución); el pergamino se genera con ruido periódico en `prepare-assets.py`; los periódicos también (los del zip traían texto fantasma).
+
 ## Datos
 `flags.mr-pizarra.board` en un JournalEntry: `{background, locked, items:{id:{type,x,y,z,…}}, links:{id:{from,to,color,style,label}}}`. Una clave por pieza: nunca se reescribe el objeto entero.
 

@@ -71,6 +71,22 @@ def safe_rect(alpha, thr=128):
     return [round(y1 / h * 100, 1), round((w - 1 - x2) / w * 100, 1), round((h - 1 - y2) / h * 100, 1), round(x1 / w * 100, 1)]
 
 
+def edge_profiles(alpha, bins=24, thr=128):
+    """Dónde empieza y acaba el papel en cada tramo: arriba/abajo (% desde arriba) e izquierda/derecha (% desde la izquierda)."""
+    small = np.array(Image.fromarray(alpha).resize((192, 240), Image.BILINEAR)) > thr
+    h, w = small.shape
+    out = {"top": [], "bottom": [], "left": [], "right": []}
+    for chunk in np.array_split(np.arange(w), bins):
+        rows = np.where(small[:, chunk].any(1))[0]
+        out["top"].append(round(float(rows[0]) / h * 100, 1) if len(rows) else 0.0)
+        out["bottom"].append(round(float(rows[-1] + 1) / h * 100, 1) if len(rows) else 100.0)
+    for chunk in np.array_split(np.arange(h), bins):
+        cols = np.where(small[chunk, :].any(0))[0]
+        out["left"].append(round(float(cols[0]) / w * 100, 1) if len(cols) else 0.0)
+        out["right"].append(round(float(cols[-1] + 1) / w * 100, 1) if len(cols) else 100.0)
+    return out
+
+
 def top_edge(alpha, bins=24, thr=128):
     """Altura (% desde arriba) a la que empieza el papel en cada tramo horizontal: el borde superior no es recto."""
     small = np.array(Image.fromarray(alpha).resize((192, 240), Image.BILINEAR)) > thr
@@ -129,7 +145,27 @@ def largest_component(alpha, thr=24):
 #  - cover:  mapas → cuarto real, extendido en una pieza.
 #  - mirror: el resto → imagen completa reflejada (1536 px), se repite sin costuras a menor escala.
 BLEND = {"corcho-claro", "corcho-noir", "lienzo-yute", "moqueta-anos-80", "carton-archivo-policial", "pizarra-escolar-tiza"}
-COVER = {"mapa-antiguo-mundo", "pergamino-nautico"}
+COVER = set()  # estirar un cuarto ×3 sale borroso: todo lo que no es textura fina va con la imagen completa (mirror)
+
+
+def periodic_noise(rng, size, sigma):
+    """Ruido que se repite sin costuras (desenfoque gaussiano en el dominio de Fourier)."""
+    f = np.fft.fft2(rng.standard_normal((size, size)))
+    ky = np.fft.fftfreq(size)[:, None]
+    kx = np.fft.fftfreq(size)[None, :]
+    out = np.real(np.fft.ifft2(f * np.exp(-2 * (np.pi * sigma) ** 2 * (kx**2 + ky**2))))
+    return (out - out.mean()) / (out.std() + 1e-9)
+
+
+def parchment(seed=7, size=1024):
+    """Pergamino propio y continuo: grano, fibras, manchas y vetas suaves. Sustituye al del generador, cuyas manchas se repetían."""
+    rng = np.random.default_rng(seed)
+    tone = periodic_noise(rng, size, 1.2) * 3.5 + periodic_noise(rng, size, 6) * 5 + periodic_noise(rng, size, 40) * 9 + periodic_noise(rng, size, 110) * 10
+    blot = np.clip(periodic_noise(rng, size, 55) - 0.9, 0, None) * 22  # manchas de té: pocas y grandes
+    fibers = periodic_noise(rng, size, 0.8) * np.abs(periodic_noise(rng, size, 25)) * 3.0
+    base = np.array([214, 190, 148], np.float32)[None, None, :]
+    img = base + (tone + fibers - blot)[..., None] * np.array([1.0, 0.95, 0.85])[None, None, :]
+    return Image.fromarray(np.clip(img, 0, 255).astype(np.uint8))
 
 
 def seamless(im):
@@ -147,6 +183,8 @@ for f in sorted((src / "fondos").glob("*.jpg")):
     m = 28
     if f.stem in BLEND:
         save(seamless(im.crop((m, m, im.width // 2, im.height // 2)).resize((1024, 1024), Image.LANCZOS)), "fondos", f.name, 82, mode="blend")
+    elif f.stem == "pergamino-nautico":
+        save(parchment(), "fondos", f.name, 82, mode="blend")
     elif f.stem in COVER:
         save(im.crop((m, m, im.width // 2, im.height // 2)).resize((1024, 1024), Image.LANCZOS), "fondos", f.name, 82, mode="cover")
     else:
@@ -156,13 +194,39 @@ for f in sorted((src / "fondos").glob("*.jpg")):
 for f in sorted((src / "recortes").glob("*.jpg")):
     save(Image.open(f).convert("RGB"), "recortes", f.name, 86)
 
+def clean_paper(seed, base, stains):
+    """Papel de periódico limpio: grano, fibras, manchas suaves y bordes algo más oscuros, sin ningún texto impreso."""
+    from PIL import ImageFilter
+    rng = np.random.default_rng(seed)
+    w, h = 1024, 1280
+
+    def layer(sigma, amp):
+        n = Image.fromarray((rng.random((h, w)) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(sigma))
+        a = np.asarray(n).astype(np.float32)
+        return (a - a.mean()) / (a.std() + 1e-6) * amp
+
+    tone = layer(1.2, 2.2) + layer(6, 3.0) + layer(40, stains) + layer(120, stains * 0.8)
+    fibers = np.asarray(Image.fromarray((rng.random((h, w)) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur((0.4, 7)))).astype(np.float32)
+    tone += (fibers - fibers.mean()) / (fibers.std() + 1e-6) * 1.6
+    yy, xx = np.mgrid[0:h, 0:w]
+    edge = np.minimum(np.minimum(xx, w - 1 - xx), np.minimum(yy, h - 1 - yy)) / 110.0
+    tone -= (1 - np.clip(edge, 0, 1)) ** 2 * 14
+    for pos in (0.5,):  # un doblez suave
+        tone -= np.exp(-(((yy / h) - pos) * 160) ** 2) * 5 - np.exp(-(((yy / h) - pos - 0.004) * 160) ** 2) * 3
+    img = np.clip(np.array(base, np.float32)[None, None, :] + tone[..., None], 0, 255).astype(np.uint8)
+    return Image.fromarray(img)
+
+
+for n, (base, stains) in enumerate([((238, 233, 218), 3), ((228, 212, 170), 5), ((208, 206, 199), 4), ((198, 172, 132), 6)], start=1):
+    save(clean_paper(100 + n, base, stains), "recortes", f"periodico-{n}.jpg", 86)
+
 for f in sorted((src / "bordes").glob("*.png")):
     alpha = np.array(Image.open(f).convert("RGBA").getchannel("A"))
     keep = largest_component(alpha)
     alpha = np.where(keep, alpha, 0).astype(np.uint8)
     white = Image.new("RGBA", alpha.shape[::-1], (255, 255, 255, 0))
     white.putalpha(Image.fromarray(alpha))
-    save(white, "bordes", f.name, 90, safe=safe_rect(alpha), top=top_edge(alpha))
+    save(white, "bordes", f.name, 90, safe=safe_rect(alpha), edge=edge_profiles(alpha))
 
 for f in sorted((src / "fotos").glob("*.png")):
     im = Image.open(f).convert("RGBA")

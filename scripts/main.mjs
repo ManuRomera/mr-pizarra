@@ -44,6 +44,8 @@ async function askNewBoard() {
 }
 
 Hooks.once("init", () => {
+  // Preferencias de accesibilidad de cada navegador (tamaño de texto, letra legible, contraste, movimiento, interfaz grande)
+  game.settings.register(ID, "a11y", { scope: "client", config: false, type: Object, default: { scale: 1, legible: false, contrast: false, calm: false, bigUi: false } });
   foundry.applications.apps.DocumentSheetConfig.registerSheet(JournalEntry, ID, BoardSheet, { label: "MR- Pizarra", makeDefault: false });
 });
 

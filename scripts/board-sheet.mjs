@@ -8,9 +8,14 @@
  *  - Mientras alguien arrastra una pieza, los demás la ven moverse en directo y no pueden cogerla (mensaje efímero).
  *  - Los documentos colgados respetan los permisos de cada persona (ver refs.mjs).
  */
-import { ID, FLAG, BOARD, BACKGROUNDS, PAPERS, MASKS, PINS, STAMPS, MARKS, FRAMES, NOTE_COLORS, THREAD_COLORS, THREAD_STYLES, TABLES, planOps, look, asset } from "./rules.mjs";
+import { ID, FLAG, BOARD, BACKGROUNDS, PAPERS, MASKS, PINS, STAMPS, MARKS, FRAMES, NOTE_COLORS, THREAD_COLORS, THREAD_STYLES, TABLES, PIN_LAYOUTS, DEFAULT_PIN_PRESET, planOps, look, asset } from "./rules.mjs";
 import { t, esc, uid, MANIFEST } from "./util.mjs";
 import { renderItem, visibleTo, widthOf } from "./items.mjs";
+
+const BLOCKED_PAPERS = new Set(["sobre", "fotocopia"]);
+const PIN_COLORS = ["#c0392b", "#2c6fbb", "#2f8f5b", "#e0b020", "#2b2b2b", "#f4f1e8", "#7d4fb5", "#e8742a"];
+const DEFAULT_A11Y = { scale: 1, legible: false, contrast: false, calm: false, bigUi: false };
+const pickImage = (current = "") => new Promise((resolve) => new foundry.applications.apps.FilePicker.implementation({ type: "image", current, callback: resolve }).render(true));
 
 const SOCKET = `module.${ID}`;
 const MIN_ZOOM = 0.2;
@@ -95,14 +100,19 @@ const choice = (name, table, value, { auto = false, none = false } = {}) => {
   return `<div class="mrp-choices">${rows.join("")}</div>`;
 };
 const field = (label, control) => `<div class="form-group stacked"><label>${label}</label><div class="form-fields">${control}</div></div>`;
-const pinChoice = (value) => field(t("decoration"), choice("pin", PINS, value ?? "auto", { auto: true, none: true }));
+const layoutSelect = (value) => `<select name="pinLayout">${["auto", ...Object.keys(PIN_LAYOUTS)].map((k) => `<option value="${k}" ${k === (value ?? "auto") ? "selected" : ""}>${k === "auto" ? t("auto") : esc(PIN_LAYOUTS[k].name)}</option>`).join("")}</select>`;
+const colorFields = (value) => {
+  const mode = value && value !== "orig" ? "custom" : (value ?? "");
+  return `<select name="pinColorMode"><option value="" ${mode === "" ? "selected" : ""}>${t("pinInherit")}</option><option value="orig" ${mode === "orig" ? "selected" : ""}>${t("pinOriginal")}</option><option value="custom" ${mode === "custom" ? "selected" : ""}>${t("pinCustom")}</option></select><input type="color" name="pinColorCustom" value="${/^#/.test(value ?? "") ? value : "#c0392b"}">`;
+};
+const pinChoice = (item) => field(t("decoration"), choice("pin", PINS, item.pin ?? "auto", { auto: true, none: true })) + field(t("pinLayout"), layoutSelect(item.pinLayout)) + field(t("pinColor"), colorFields(item.pinColor));
 const rotation = (value) => field(t("rotation"), `<input type="range" name="rot" min="-20" max="20" step="1" value="${value ?? 0}">`);
 
 function formHTML(type, item) {
   const parts = [];
   if (type === "note") {
     const swatches = NOTE_COLORS.map((c) => `<label class="mrp-choice"><input type="radio" name="color" value="${c}" ${c === item.color ? "checked" : ""}><span class="mrp-thumb mrp-note-${c}"></span></label>`).join("");
-    parts.push(field(t("text"), `<textarea name="text" rows="4" autofocus>${esc(item.text)}</textarea>`), field(t("color"), `<div class="mrp-choices mrp-swatches">${swatches}</div>`), pinChoice(item.pin));
+    parts.push(field(t("text"), `<textarea name="text" rows="4" autofocus>${esc(item.text)}</textarea>`), field(t("color"), `<div class="mrp-choices mrp-swatches">${swatches}</div>`), pinChoice(item));
   } else if (type === "clipping") {
     const ratio = item.ratio ?? 1.25;
     const fmt = Object.entries(FORMATS).reduce((best, [k, v]) => (Math.abs(v - ratio) < Math.abs(FORMATS[best] - ratio) ? k : best), "tall");
@@ -113,14 +123,14 @@ function formHTML(type, item) {
       field(t("paper"), choice("paper", PAPERS, item.paper)),
       field(t("shape"), choice("mask", MASKS, item.mask ?? "auto", { auto: true, none: true })),
       field(t("format"), `<select name="ratio">${formats}</select>`),
-      pinChoice(item.pin),
+      pinChoice(item),
     );
   } else if (type === "photo") {
     parts.push(
       field(t("image"), `<input type="text" name="src" value="${esc(item.src)}" required><button type="button" class="mrp-browse"><i class="fa-solid fa-file-image"></i> ${t("browse")}</button>`),
       field(t("caption"), `<input type="text" name="text" value="${esc(item.text)}" maxlength="120">`),
       field(t("frame"), choice("frame", FRAMES, item.frame)),
-      pinChoice(item.pin),
+      pinChoice(item),
     );
   } else if (type === "stamp") {
     parts.push(field(t("text"), `<input type="text" name="text" value="${esc(item.text)}" maxlength="60" autofocus>`), field(t("stamp"), choice("kind", STAMPS, item.kind)));
@@ -129,7 +139,7 @@ function formHTML(type, item) {
   } else {
     if (type === "entity") parts.push(field(t("frame"), choice("frame", FRAMES, item.frame)));
     if (type === "journal") parts.push(field(t("format"), `<select name="ratio">${Object.entries(FORMATS).map(([k, v]) => `<option value="${v}" ${v === (item.ratio ?? 1.25) ? "selected" : ""}>${t(`format${k[0].toUpperCase()}${k.slice(1)}`)}</option>`).join("")}</select>`), field(t("shape"), choice("mask", MASKS, item.mask ?? "auto", { auto: true, none: true })));
-    parts.push(pinChoice(item.pin));
+    parts.push(pinChoice(item));
   }
   if (type !== "mark") parts.push(rotation(item.rot));
   parts.push(
@@ -160,6 +170,11 @@ async function askItem(type, item, title) {
   if ("ratio" in out) out.ratio = Number(out.ratio);
   out.owner = out.private ? game.user.id : "";
   delete out.private;
+  if ("pinColorMode" in out) {
+    out.pinColor = out.pinColorMode === "custom" ? out.pinColorCustom : out.pinColorMode;
+    delete out.pinColorMode;
+    delete out.pinColorCustom;
+  }
   if (!game.user.isGM) delete out.hidden;
   else out.hidden = Boolean(out.hidden);
   return out;
@@ -181,11 +196,15 @@ function documentOptions() {
 
 /** Reduce el texto de una pieza hasta que cabe en su zona segura. */
 function fitText(el) {
-  for (const box of el.querySelectorAll(".mrp-text")) {
+  for (const box of el.querySelectorAll(".mrp-text, .mrp-stamptext, .mrp-caption")) {
+    // sellos y pies de foto fijan su tamaño en px: se escalan con una variable; el resto con em
+    const own = box.classList.contains("mrp-stamptext") || box.classList.contains("mrp-caption");
+    const apply = (size) => (own ? box.style.setProperty("--fit", size.toFixed(2)) : (box.style.fontSize = `${size.toFixed(2)}em`));
     let size = 1;
-    while ((box.scrollHeight > box.clientHeight + 1 || box.scrollWidth > box.clientWidth + 1) && size > 0.45) {
+    apply(1);
+    while ((box.scrollHeight > box.clientHeight + 1 || box.scrollWidth > box.clientWidth + 1) && size > 0.4) {
       size -= 0.05;
-      box.style.fontSize = `${size.toFixed(2)}em`;
+      apply(size);
     }
   }
 }
@@ -245,6 +264,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
   #history = [];
   #preview = new Map();
   #raf = 0;
+  #flyoutKey = null;
 
   constructor(options = {}) {
     const saved = stored(`win.${options.document?.id}`, {});
@@ -290,12 +310,14 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
   /** La vista inicial se calcula con la ventana ya en pantalla (antes no tiene tamaño). */
   async _onRender(context, options) {
     await super._onRender(context, options);
+    this.#fitAll();
     if (this.#viewLoaded) return;
     this.#viewLoaded = true;
     const viewport = this.#root.querySelector(".mrp-viewport");
     const observer = new ResizeObserver(() => {
       if (viewport.clientWidth < 200 || viewport.clientHeight < 200) return;
       observer.disconnect();
+      this.#fitAll();
       const saved = stored(`view.${this.document.id}.${game.user.id}`, null);
       if (saved) {
         this.#view = saved;
@@ -303,6 +325,11 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
       } else this.#fit();
     });
     observer.observe(viewport);
+  }
+
+  /** Ajusta el texto de todas las piezas (necesita la ventana ya en pantalla para poder medir). */
+  #fitAll() {
+    for (const el of this.#root?.querySelectorAll(".mrp-item") ?? []) fitText(el);
   }
 
   _replaceHTML(result, content) {
@@ -317,13 +344,15 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
       `<button type="button" class="mrp-tool" data-tool="${name}" data-tooltip="${esc(t(label))}${key ? ` · ${key}` : ""}" data-tooltip-direction="RIGHT" aria-label="${esc(t(label))}"><i class="${icon}"></i></button>`;
     const rail = TOOLS.map((g) => `<div class="mrp-tools" data-group="${g.group}">${g.items.map(btn).join("")}</div>`).join("");
     content.innerHTML = `<div class="mrp-root" tabindex="-1">
-      <nav class="mrp-rail" aria-label="${esc(t("title"))}">${rail}</nav>
+      <nav class="mrp-rail" role="toolbar" aria-orientation="vertical" aria-label="${esc(t("title"))}">${rail}</nav>
       <div class="mrp-main">
         <header class="mrp-topbar">
           <div class="mrp-title"><span class="mrp-badge-logo"><i class="fa-solid fa-thumbtack"></i></span><div><strong class="mrp-name"></strong><small class="mrp-meta"></small></div></div>
           <div class="mrp-chips">
+            <button type="button" class="mrp-chip" data-act="pins" aria-haspopup="dialog" data-tooltip="${esc(t("pinPreset"))}"><i class="fa-solid fa-thumbtack"></i><span class="mrp-pinlabel"></span></button>
             <button type="button" class="mrp-chip" data-act="bg"><i class="fa-solid fa-palette"></i><span class="mrp-bgname"></span></button>
             ${game.user.isGM ? `<button type="button" class="mrp-chip" data-act="lock"><i class="fa-solid fa-lock-open"></i><span>${esc(t("lock"))}</span></button>` : ""}
+            <button type="button" class="mrp-chip mrp-chip-icon" data-act="a11y" aria-haspopup="dialog" data-tooltip="${esc(t("a11y"))}" aria-label="${esc(t("a11y"))}"><i class="fa-solid fa-universal-access"></i></button>
             <button type="button" class="mrp-chip mrp-chip-icon" data-act="help" data-tooltip="${esc(t("help"))}" aria-label="${esc(t("help"))}"><i class="fa-regular fa-circle-question"></i></button>
           </div>
         </header>
@@ -340,14 +369,16 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
           <div class="mrp-zoombar"><button type="button" data-act="out" aria-label="${esc(t("zoomOut"))}" data-tooltip="${esc(t("zoomOut"))}"><i class="fa-solid fa-minus"></i></button><button type="button" class="mrp-zoomval" data-act="zoom100" data-tooltip="100%">70%</button><button type="button" data-act="in" aria-label="${esc(t("zoomIn"))}" data-tooltip="${esc(t("zoomIn"))}"><i class="fa-solid fa-plus"></i></button><button type="button" data-act="fit" aria-label="${esc(t("fit"))}" data-tooltip="${esc(t("fit"))}"><i class="fa-solid fa-expand"></i></button></div>
           <canvas class="mrp-minimap" width="220" height="138" aria-hidden="true"></canvas>
           <div class="mrp-help" hidden>${this.#helpHTML()}</div>
+          <div class="mrp-live" role="status" aria-live="polite"></div>
         </div>
       </div></div>`;
     this.#root = content.querySelector(".mrp-root");
     this.#listen();
+    this.#applyA11y();
   }
 
   #helpHTML() {
-    const rows = ["helpSelect", "helpMulti", "helpMove", "helpScale", "helpRotate", "helpPan", "helpDelete", "helpUndo", "helpDuplicate", "helpThread"].map((k) => `<li>${t(k)}</li>`).join("");
+    const rows = ["helpEdit", "helpSelect", "helpMulti", "helpMove", "helpScale", "helpRotate", "helpPan", "helpDelete", "helpUndo", "helpDuplicate", "helpThread"].map((k) => `<li>${t(k)}</li>`).join("");
     return `<h4>${t("help")}</h4><ul>${rows}</ul>`;
   }
 
@@ -366,7 +397,16 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     viewport.addEventListener("pointerdown", (event) => this.#down(event));
     viewport.addEventListener("dblclick", (event) => {
       const id = event.target.closest(".mrp-item")?.dataset.id;
-      if (id) this.#activate(id);
+      if (id) this.#dblclick(id, event);
+    });
+    // un clic fuera de un desplegable lo cierra
+    root.addEventListener("pointerdown", (event) => {
+      if (!event.target.closest(".mrp-flyout, [data-tool], [data-act]")) this.#closeFlyout();
+    }, true);
+    // al llegar con el teclado a una pieza (Tab) queda seleccionada y se anuncia
+    root.addEventListener("focusin", (event) => {
+      const el = event.target.closest?.(".mrp-item");
+      if (el && !this.#sel.has(el.dataset.id) && !this.#threadMode) this.#select([el.dataset.id]);
     });
     viewport.addEventListener("contextmenu", (event) => this.#contextmenu(event));
     viewport.addEventListener("dragover", (event) => event.preventDefault());
@@ -382,6 +422,11 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     root.querySelector(".mrp-items").addEventListener("load", () => this.#schedule(), true);
   }
 
+  #toggleFlyout(key, open) {
+    if (this.#flyoutKey === key) return this.#closeFlyout();
+    open();
+  }
+
   #act(act, event) {
     const rect = this.#root.querySelector(".mrp-viewport").getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
@@ -391,6 +436,8 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     else if (act === "fit") this.#fit();
     else if (act === "zoom100") this.#zoomAt(1 / this.#view.k, cx, cy);
     else if (act === "bg") this.#tool("bg");
+    else if (act === "pins") this.#toggleFlyout("pin-board", () => this.#pinFlyout(event.target.closest("button"), "board"));
+    else if (act === "a11y") this.#toggleFlyout("a11y", () => this.#a11yFlyout(event.target.closest("button")));
     else if (act === "lock") this.#tool("lock");
     else if (act === "help") {
       const help = this.#root.querySelector(".mrp-help");
@@ -471,12 +518,13 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     }
     this.#root.querySelector(".mrp-name").textContent = this.document.name;
     this.#root.querySelector(".mrp-bgname").textContent = bg.name;
+    this.#root.querySelector(".mrp-pinlabel").textContent = this.#pinLabel();
     const container = this.#root.querySelector(".mrp-items");
     const seen = new Set();
     for (const [id, item] of Object.entries(board.items ?? {})) {
       if (!visibleTo(item)) continue;
       seen.add(id);
-      const { html, sig } = renderItem(id, item);
+      const { html, sig } = renderItem(id, item, board);
       const old = container.querySelector(`[data-id="${id}"]`);
       if (old && this.#sigs.get(id) === sig) continue;
       const el = document.createRange().createContextualFragment(html).firstElementChild;
@@ -593,6 +641,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
       ${b("rot-", "fa-solid fa-rotate-left", "rotateLeft")}${b("rot+", "fa-solid fa-rotate-right", "rotateRight")}${sep}
       ${b("scale-", "fa-solid fa-down-left-and-up-right-to-center", "scaleDown")}${b("scale+", "fa-solid fa-up-right-and-down-left-from-center", "scaleUp")}${sep}
       ${n > 1 ? `${b("align", "fa-solid fa-align-left", "align")}${sep}` : ""}
+      ${b("pins", "fa-solid fa-thumbtack", "decoration")}${n === 1 ? b("details", "fa-solid fa-sliders", "editDetails") : ""}
       ${b("dup", "fa-regular fa-clone", "duplicate")}${b("front", "fa-solid fa-arrow-up-long", "front")}${b("back", "fa-solid fa-arrow-down-long", "back")}
       ${game.user.isGM ? b("hide", "fa-solid fa-eye-slash", "hideToggle") : ""}${sep}${b("del", "fa-solid fa-trash", "remove", 'class="danger"')}`;
   }
@@ -603,6 +652,8 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     if (act === "scale-") return this.#scaleSel(0.9);
     if (act === "scale+") return this.#scaleSel(1.1);
     if (act === "align") return this.#alignMenu(event);
+    if (act === "pins") return this.#toggleFlyout("pin-selection", () => this.#pinFlyout(event.target.closest("button"), "selection"));
+    if (act === "details") return this.#edit([...this.#sel][0]);
     if (act === "dup") return this.#duplicate();
     if (act === "front") return this.#reorder(true);
     if (act === "back") return this.#reorder(false);
@@ -621,6 +672,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     this.#root.querySelectorAll(".mrp-item").forEach((el) => el.classList.toggle("mrp-selected", this.#sel.has(el.dataset.id)));
     this.#drawSel();
     this.#schedule();
+    if (this.#sel.size) this.#say(`${this.#sel.size} ${t(this.#sel.size === 1 ? "pieceOne" : "pieceMany")} ${t("selectedWord")}`);
   }
 
   /* ---------- hilos ---------- */
@@ -630,9 +682,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     const h = el.offsetHeight;
     const pv = this.#preview.get(id);
     const f = pv?.f ?? 1;
-    const ox = (w * Number(el.dataset.fx) + Number(el.dataset.pinx) - w / 2) * f;
-    const oy = (Number(el.dataset.pint) - h / 2) * f;
-    const p = rotate(ox, oy, (Number(el.dataset.rot) || 0) + (pv?.th ?? 0));
+    const p = rotate((Number(el.dataset.ax) - w / 2) * f, (Number(el.dataset.ay) - h / 2) * f, (Number(el.dataset.rot) || 0) + (pv?.th ?? 0));
     return { x: (pv?.cx ?? el.offsetLeft + w / 2) + p.x, y: (pv?.cy ?? el.offsetTop + h / 2) + p.y };
   }
 
@@ -692,6 +742,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
 
   #down(event) {
     if (event.button === 2) return;
+    if (event.target.closest("[contenteditable=plaintext-only], [contenteditable=true]")) return;
     this.#closeMenu();
     this.#root.focus({ preventScroll: true });
     if (event.target.closest(".mrp-minimap")) return this.#track(event, (e) => this.#minimapPoint(e), () => {}, () => this.#minimapPoint(event));
@@ -1071,8 +1122,8 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     if (name === "lock") return this.#commit([{ op: "set", kind: "settings", id: uid(), data: { locked: !this.board.locked } }]);
     if (!this.canEdit) return ui.notifications.warn(t("locked"));
     if (name === "bg") return this.#pickBackground();
-    if (name === "doc") return this.#pickDocument();
-    return this.#create(name);
+    const button = this.#root.querySelector(`[data-tool="${name}"]`);
+    return this.#toggleFlyout(name, () => (name === "doc" ? this.#docFlyout(button) : this.#variantFlyout(name, button)));
   }
 
   #center() {
@@ -1081,7 +1132,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     return { x: p.x + (Math.random() - 0.5) * 120, y: p.y + (Math.random() - 0.5) * 80 };
   }
 
-  async #create(type, at) {
+  async #createDetailed(type, at) {
     const base = {
       note: { type: "note", text: "", color: NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)] },
       clipping: { type: "clipping", title: "", text: "", paper: "periodico-1" },
@@ -1108,17 +1159,6 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
       rejectClose: false,
     });
     if (data?.background) this.#commit([{ op: "set", kind: "settings", id: uid(), data: { background: data.background } }]);
-  }
-
-  async #pickDocument() {
-    const data = await foundry.applications.api.DialogV2.input({
-      window: { title: t("pickDocument"), icon: "fa-regular fa-file-lines" },
-      position: { width: 520 },
-      content: `<div class="mrp-form"><p class="hint">${t("pickDocumentHint")}</p><div class="form-group"><select name="uuid">${documentOptions()}</select></div></div>`,
-      ok: { label: t("add"), icon: "fa-solid fa-thumbtack" },
-      rejectClose: false,
-    });
-    if (data?.uuid) this.#addRef(data.uuid, this.#center());
   }
 
   #addRef(uuid, point) {
@@ -1169,8 +1209,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     const menu = document.createElement("div");
     menu.className = "mrp-menu";
     menu.setAttribute("role", "menu");
-    menu.style.left = `${Math.max(8, Math.min(event.clientX - rect.left, rect.width - 260))}px`;
-    menu.style.top = `${Math.max(8, Math.min(event.clientY - rect.top, rect.height - list.length * 36 - 14))}px`;
+    menu.style.visibility = "hidden";
     for (const entry of list) {
       if (entry.separator) {
         menu.insertAdjacentHTML("beforeend", `<hr>`);
@@ -1188,6 +1227,8 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
       menu.append(button);
     }
     this.#root.append(menu);
+    this.#place(menu, event.clientX - rect.left, event.clientY - rect.top);
+    menu.style.visibility = "";
     menu.querySelector("button")?.focus();
   }
 
@@ -1211,7 +1252,9 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     const allPrivate = ids.every((i) => this.board.items[i].owner);
     this.#menu(event, [
       !multi && isRef && { icon: "fa-regular fa-folder-open", label: t("openDoc"), fn: () => this.#openRef(item) },
-      !multi && edit && { icon: "fa-solid fa-pen", label: t("edit"), fn: () => this.#edit(id) },
+      !multi && edit && item.type !== "mark" && !isRef && { icon: "fa-solid fa-i-cursor", label: t("editText"), fn: () => this.#startEdit(id, item.type === "clipping" ? "title" : "text") },
+      !multi && edit && { icon: "fa-solid fa-sliders", label: t("editDetails"), fn: () => this.#edit(id) },
+      edit && { icon: "fa-solid fa-thumbtack", label: t("decoration"), fn: () => this.#pinFlyout(this.#root.querySelector(".mrp-selbar button[data-act=pins]") ?? this.#root.querySelector("[data-act=pins]"), "selection") },
       !multi && edit && { icon: "fa-solid fa-bezier-curve", label: t("threadFrom"), fn: () => ((this.#threadMode = true), (this.#threadFrom = id), this.#select([]), this.#el(id)?.classList.add("mrp-threadsrc"), this.#hud()) },
       edit && { separator: true },
       edit && { icon: "fa-regular fa-clone", label: t(multi ? "duplicateSel" : "duplicate"), fn: () => this.#duplicate() },
@@ -1255,13 +1298,6 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     if (data) this.#commit([{ op: "set", kind: "items", id, data }]);
   }
 
-  #activate(id) {
-    const item = this.board.items[id];
-    if (!item) return;
-    if (["journal", "entity"].includes(item.type)) return this.#openRef(item);
-    if (this.canEdit && !this.#threadMode) this.#edit(id);
-  }
-
   async #openRef(item) {
     const doc = await fromUuid(item.uuid);
     if (!doc || !(game.user.isGM || doc.testUserPermission(game.user, "OBSERVER"))) return ui.notifications.warn(t("noPermission"));
@@ -1269,10 +1305,319 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     return doc.sheet.render({ force: true });
   }
 
+  /* ---------- accesibilidad ---------- */
+
+  get #a11y() {
+    return { ...DEFAULT_A11Y, ...(game.settings.get(ID, "a11y") ?? {}) };
+  }
+
+  #applyA11y() {
+    const a = this.#a11y;
+    const root = this.#root;
+    root.classList.toggle("mrp-legible", a.legible);
+    root.classList.toggle("mrp-hc", a.contrast);
+    root.classList.toggle("mrp-calm", a.calm);
+    root.classList.toggle("mrp-bigui", a.bigUi);
+    root.style.setProperty("--tscale", String(a.scale));
+    this.#sigs.clear();
+    for (const box of root.querySelectorAll(".mrp-text")) box.style.fontSize = "";
+    this.refresh();
+  }
+
+  /** Mensaje para lectores de pantalla. */
+  #say(message) {
+    const live = this.#root?.querySelector(".mrp-live");
+    if (!live) return;
+    live.textContent = "";
+    setTimeout(() => (live.textContent = message), 40);
+  }
+
+  #a11yFlyout(anchor) {
+    const a = this.#a11y;
+    const check = (key, label) => `<label class="mrp-check"><input type="checkbox" data-a11y="${key}" ${a[key] ? "checked" : ""}> <span>${esc(t(label))}</span></label>`;
+    this.#flyout(anchor, t("a11y"), `<div class="mrp-fly-section"><label for="mrp-scale">${esc(t("a11yScale"))}: <b class="mrp-scaleval">${Math.round(a.scale * 100)}%</b></label>
+        <input id="mrp-scale" type="range" min="0.8" max="2" step="0.1" value="${a.scale}" data-a11y="scale"></div>
+      ${check("legible", "a11yLegible")}${check("contrast", "a11yContrast")}${check("calm", "a11yCalm")}${check("bigUi", "a11yBigUi")}
+      <p class="mrp-fly-note">${esc(t("a11yNote"))}</p>`, {
+      side: "below",
+      mount: (box) => {
+        box.addEventListener("input", async (event) => {
+          const key = event.target.dataset.a11y;
+          if (!key) return;
+          const value = event.target.type === "checkbox" ? event.target.checked : Number(event.target.value);
+          if (key === "scale") box.querySelector(".mrp-scaleval").textContent = `${Math.round(value * 100)}%`;
+          await game.settings.set(ID, "a11y", { ...this.#a11y, [key]: value });
+          this.#applyA11y();
+        });
+      },
+    });
+  }
+
+  /* ---------- desplegables ---------- */
+
+  #closeFlyout() {
+    this.#root?.querySelectorAll(".mrp-flyout").forEach((f) => f.remove());
+    this.#flyoutKey = null;
+  }
+
+  /** Coloca un panel dentro de la ventana (coordenadas respecto a ella) compensando el `zoom` CSS de la interfaz grande. */
+  #place(box, left, top) {
+    const root = this.#root.getBoundingClientRect();
+    const z = Number(getComputedStyle(box).zoom) || 1;
+    const rect = box.getBoundingClientRect();
+    const x = Math.max(8, Math.min(left, root.width - rect.width - 10));
+    const y = Math.max(8, Math.min(top, root.height - rect.height - 10));
+    box.style.left = `${x / z}px`;
+    box.style.top = `${y / z}px`;
+  }
+
+  /** Panel flotante junto a un botón: al lado del dock (`right`) o bajo la barra superior (`below`). */
+  #flyout(anchor, title, html, { side = "right", key = title, mount } = {}) {
+    this.#closeFlyout();
+    this.#closeMenu();
+    const root = this.#root.getBoundingClientRect();
+    const a = anchor.getBoundingClientRect();
+    const box = document.createElement("div");
+    box.className = "mrp-flyout";
+    box.setAttribute("role", "dialog");
+    box.setAttribute("aria-label", title);
+    box.innerHTML = `<header><strong>${esc(title)}</strong><button type="button" data-fly="close" aria-label="${esc(t("close"))}"><i class="fa-solid fa-xmark"></i></button></header><div class="mrp-fly-body">${html}</div>`;
+    this.#root.append(box);
+    this.#place(box, side === "right" ? a.right - root.left + 10 : a.left - root.left, side === "right" ? a.top - root.top - 6 : a.bottom - root.top + 8);
+    box.addEventListener("click", (event) => {
+      if (event.target.closest('[data-fly="close"]')) this.#closeFlyout();
+    });
+    mount?.(box);
+    this.#flyoutKey = key;
+    box.querySelector("input, button.mrp-var, button:not([data-fly])")?.focus({ preventScroll: true });
+    return box;
+  }
+
+  /** Variantes de cada tipo de pieza para el desplegable del dock. */
+  #variants(tool) {
+    const img = (folder, id) => `<img src="${asset(folder, id)}" alt="" loading="lazy">`;
+    const list = (table) => table.map((e) => ({ id: e.id, name: e.name, group: e.group, thumb: img(e.folder, e.id) }));
+    if (tool === "note") return NOTE_COLORS.map((c) => ({ id: c, name: c[0].toUpperCase() + c.slice(1), thumb: img("recortes", `postit-${c}`) }));
+    if (tool === "clipping") return list(PAPERS.filter((p) => !BLOCKED_PAPERS.has(p.style)));
+    if (tool === "photo") return list(FRAMES);
+    if (tool === "stamp") return list(STAMPS);
+    if (tool === "mark") return list(MARKS);
+    return [];
+  }
+
+  #variantFlyout(tool, anchor) {
+    const entries = this.#variants(tool);
+    let group = null;
+    const rows = entries.map((e) => {
+      const head = e.group && e.group !== group ? `<h5 class="mrp-group">${esc(e.group)}</h5>` : "";
+      group = e.group ?? group;
+      return `${head}<button type="button" class="mrp-var" data-variant="${e.id}" aria-label="${esc(e.name)}"><span class="mrp-vthumb">${e.thumb}</span><em>${esc(e.name)}</em></button>`;
+    });
+    const random = `<button type="button" class="mrp-var mrp-var-random" data-variant="random" aria-label="${esc(t("random"))}"><span class="mrp-vthumb"><i class="fa-solid fa-dice"></i></span><em>${esc(t("random"))}</em></button>`;
+    this.#flyout(anchor, t(tool), `<div class="mrp-vgrid">${random}${rows.join("")}</div><button type="button" class="mrp-fly-more" data-fly="more"><i class="fa-solid fa-sliders"></i> ${esc(t("moreOptions"))}</button>`, {
+      key: tool,
+      mount: (box) =>
+        box.addEventListener("click", (event) => {
+          const variant = event.target.closest("[data-variant]")?.dataset.variant;
+          if (variant) return this.#quickCreate(tool, variant);
+          if (event.target.closest('[data-fly="more"]')) {
+            this.#closeFlyout();
+            this.#createDetailed(tool);
+          }
+        }),
+    });
+  }
+
+  /** Crea la pieza con la variante elegida, sin ventana, y deja el cursor para escribir directamente. */
+  async #quickCreate(tool, variant) {
+    const any = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    const pickId = (arr) => (variant === "random" ? any(arr).id : variant);
+    const base = { rot: Math.round((Math.random() * 2 - 1) * 5) };
+    if (tool === "note") Object.assign(base, { type: "note", text: "", color: variant === "random" ? any(NOTE_COLORS) : variant });
+    if (tool === "clipping") Object.assign(base, { type: "clipping", title: "", text: "", paper: pickId(PAPERS.filter((p) => !BLOCKED_PAPERS.has(p.style))) });
+    if (tool === "photo") Object.assign(base, { type: "photo", src: "", text: "", frame: pickId(FRAMES) });
+    if (tool === "stamp") Object.assign(base, { type: "stamp", kind: pickId(STAMPS), text: "" });
+    if (tool === "mark") Object.assign(base, { type: "mark", kind: pickId(MARKS) });
+    const point = this.#center();
+    const w = widthOf(base);
+    const id = uid();
+    this.#closeFlyout();
+    await this.#commit([{ op: "set", kind: "items", id, data: { ...base, x: Math.round(point.x - w / 2), y: Math.round(point.y - w / 2), z: this.#topZ() + 1 } }]);
+    this.#select([id]);
+    this.#say(t("created"));
+    this.#afterRender(id, () => (tool === "photo" ? this.#chooseImage(id) : tool === "mark" ? null : this.#startEdit(id, tool === "clipping" ? "title" : "text")));
+  }
+
+  /** Espera a que la pieza recién creada exista en pantalla (llega con la actualización del diario). */
+  #afterRender(id, fn, tries = 40) {
+    if (this.#el(id)) return fn();
+    if (tries > 0) setTimeout(() => this.#afterRender(id, fn, tries - 1), 50);
+  }
+
+  async #chooseImage(id) {
+    const item = this.board.items[id];
+    if (!item) return;
+    const path = await pickImage(item.src ?? "");
+    if (path) this.#commit([{ op: "set", kind: "items", id, data: { src: path } }]);
+  }
+
+  #docFlyout(anchor) {
+    const readable = (doc) => game.user.isGM || doc.testUserPermission(game.user, "OBSERVER");
+    const entries = [
+      ...game.journal.filter((j) => readable(j) && !j.getFlag(ID, "board")).flatMap((j) => [{ group: t("journals"), label: j.name, uuid: j.uuid }, ...j.pages.filter(readable).map((p) => ({ group: t("journals"), label: `${j.name} › ${p.name}`, uuid: p.uuid }))]),
+      ...game.actors.filter(readable).map((a) => ({ group: t("actors"), label: a.name, uuid: a.uuid })),
+      ...(game.user.isGM ? game.scenes.map((s) => ({ group: t("scenes"), label: s.name, uuid: s.uuid })) : []),
+      ...game.items.filter(readable).map((i) => ({ group: t("items"), label: i.name, uuid: i.uuid })),
+    ];
+    let group = null;
+    const rows = entries.map((e) => {
+      const head = e.group !== group ? `<h5 class="mrp-group">${esc(e.group)}</h5>` : "";
+      group = e.group;
+      return `${head}<button type="button" class="mrp-doc" data-uuid="${e.uuid}" data-q="${esc(e.label.toLowerCase())}"><i class="fa-regular fa-file-lines"></i> ${esc(e.label)}</button>`;
+    });
+    this.#flyout(anchor, t("pickDocument"), `<input type="search" class="mrp-search" placeholder="${esc(t("search"))}" aria-label="${esc(t("search"))}"><p class="mrp-fly-note">${esc(t("pickDocumentHint"))}</p><div class="mrp-doclist">${rows.join("") || `<p class="mrp-fly-note">${esc(t("noDocs"))}</p>`}</div>`, {
+      key: "doc",
+      mount: (box) => {
+        box.querySelector(".mrp-search").addEventListener("input", (event) => {
+          const q = event.target.value.trim().toLowerCase();
+          box.querySelectorAll(".mrp-doc").forEach((b) => (b.hidden = Boolean(q) && !b.dataset.q.includes(q)));
+        });
+        box.addEventListener("click", (event) => {
+          const uuid = event.target.closest("[data-uuid]")?.dataset.uuid;
+          if (!uuid) return;
+          this.#closeFlyout();
+          this.#addRef(uuid, this.#center());
+        });
+      },
+    });
+  }
+
+  /* ---------- sujeción: por defecto de la pizarra o de la selección ---------- */
+
+  #pinPreset() {
+    return { ...DEFAULT_PIN_PRESET, ...(this.board.pinPreset ?? {}) };
+  }
+
+  #pinLabel() {
+    const p = this.#pinPreset();
+    const pin = p.pin === "auto" ? t("auto") : p.pin === "none" ? t("none") : (TABLES.pin.get(p.pin)?.name ?? p.pin);
+    const layout = p.layout === "auto" ? t("auto") : (PIN_LAYOUTS[p.layout]?.name ?? p.layout);
+    return `${pin} · ${layout}`;
+  }
+
+  #pinFlyout(anchor, target) {
+    const isBoard = target === "board";
+    const ids = this.#selected();
+    const first = this.board.items?.[ids[0]] ?? {};
+    let cur = isBoard ? this.#pinPreset() : { pin: first.pin ?? "auto", color: first.pinColor ?? "", layout: first.pinLayout ?? "auto" };
+    const origColor = isBoard ? "" : "orig";
+    const tile = (attr, val, label, inner) => `<button type="button" class="mrp-var" data-${attr}="${val}" aria-label="${esc(label)}"><span class="mrp-vthumb">${inner}</span><em>${esc(label)}</em></button>`;
+    const spots = (key) => PIN_LAYOUTS[key].pins.map((s) => `<circle cx="${4 + s.x * 26}" cy="${5 + s.y * 32}" r="3.2"/>`).join("");
+    const pins = [tile("pin", "auto", t("auto"), `<i class="fa-solid fa-dice"></i>`), tile("pin", "none", t("none"), `<i class="fa-solid fa-ban"></i>`), ...PINS.map((p) => tile("pin", p.id, p.name, `<img src="${asset(p.folder, p.id)}" alt="">`))].join("");
+    const layouts = [tile("layout", "auto", t("auto"), `<i class="fa-solid fa-dice"></i>`), ...Object.entries(PIN_LAYOUTS).map(([k, l]) => tile("layout", k, l.name, `<svg viewBox="0 0 34 42" aria-hidden="true"><rect x="4" y="5" width="26" height="32" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/>${spots(k)}</svg>`))].join("");
+    const swatches = [`<button type="button" class="mrp-colorbtn mrp-colorbtn-orig" data-color="${origColor}" aria-label="${esc(t("pinOriginal"))}" data-tooltip="${esc(t("pinOriginal"))}"><i class="fa-solid fa-droplet-slash"></i></button>`, ...PIN_COLORS.map((c) => `<button type="button" class="mrp-colorbtn" data-color="${c}" style="--c:${c}" aria-label="${c}"></button>`)].join("");
+    const body = `<h5 class="mrp-group">${esc(t("decoration"))}</h5><div class="mrp-vgrid">${pins}</div>
+      <h5 class="mrp-group">${esc(t("pinColor"))}</h5><div class="mrp-colors">${swatches}<input type="color" class="mrp-colorpick" value="#c0392b" aria-label="${esc(t("pinCustom"))}"></div>
+      <h5 class="mrp-group">${esc(t("pinLayout"))}</h5><div class="mrp-vgrid mrp-layouts">${layouts}</div>
+      <button type="button" class="mrp-fly-more" data-fly="${isBoard ? "applyAll" : "inherit"}"><i class="fa-solid fa-rotate-left"></i> ${esc(t(isBoard ? "pinApplyAll" : "pinInheritBoard"))}</button>`;
+    const mark = (box) => {
+      box.querySelectorAll("[data-pin]").forEach((b) => b.classList.toggle("on", b.dataset.pin === cur.pin));
+      box.querySelectorAll("[data-layout]").forEach((b) => b.classList.toggle("on", b.dataset.layout === cur.layout));
+      box.querySelectorAll("[data-color]").forEach((b) => b.classList.toggle("on", b.dataset.color === cur.color));
+    };
+    this.#flyout(anchor, t(isBoard ? "pinPreset" : "decoration"), body, {
+      side: isBoard ? "below" : "right",
+      key: `pin-${target}`,
+      mount: (box) => {
+        mark(box);
+        const apply = (change) => {
+          cur = { ...cur, ...change };
+          mark(box);
+          if (isBoard) return this.#commit([{ op: "set", kind: "settings", id: uid(), data: { pinPreset: cur } }]);
+          const data = { pin: cur.pin, pinLayout: cur.layout, pinColor: cur.color };
+          return this.#commit(this.#selected().filter((id) => ["note", "clipping", "photo", "journal", "entity"].includes(this.board.items[id].type)).map((id) => ({ op: "set", kind: "items", id, data })));
+        };
+        box.addEventListener("click", async (event) => {
+          const b = event.target.closest("button");
+          if (!b) return;
+          if (b.dataset.pin !== undefined) apply({ pin: b.dataset.pin });
+          else if (b.dataset.layout !== undefined) apply({ layout: b.dataset.layout });
+          else if (b.dataset.color !== undefined) apply({ color: b.dataset.color });
+          else if (b.dataset.fly === "applyAll") {
+            const ids = Object.entries(this.board.items ?? {}).filter(([, i]) => ["note", "clipping", "photo", "journal", "entity"].includes(i.type)).map(([id]) => id);
+            this.#commit(ids.map((id) => ({ op: "set", kind: "items", id, data: { pin: "auto", pinLayout: "auto", pinColor: "" } })));
+          } else if (b.dataset.fly === "inherit") {
+            cur = { pin: "auto", color: "", layout: "auto" };
+            mark(box);
+            this.#commit(this.#selected().map((id) => ({ op: "set", kind: "items", id, data: { pin: "auto", pinLayout: "auto", pinColor: "" } })));
+          }
+        });
+        box.querySelector(".mrp-colorpick").addEventListener("input", (event) => apply({ color: event.target.value }));
+      },
+    });
+  }
+
+  /* ---------- edición directa sobre la pieza ---------- */
+
+  #startEdit(id, name) {
+    const item = this.board.items?.[id];
+    const el = this.#el(id);
+    const target = el?.querySelector(`[data-field="${name}"]`);
+    if (!item || !target || !this.canEdit) return;
+    const single = name !== "text" || item.type !== "clipping";
+    const original = item[name] ?? "";
+    let cancelled = false;
+    el.classList.add("mrp-editing");
+    target.contentEditable = "plaintext-only";
+    target.focus();
+    const range = document.createRange();
+    range.selectNodeContents(target);
+    range.collapse(false); // cursor al final: corregir un texto no lo reemplaza
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    // textContent y no innerText: este aplica text-transform y guardaría el titular en mayúsculas
+    const clean = () => target.textContent.replaceAll("\u00a0", " ").replace(/\n+$/, "");
+    const onKey = (event) => {
+      event.stopPropagation();
+      if (event.key === "Escape") {
+        cancelled = true;
+        target.blur();
+      } else if (event.key === "Enter" && (single || event.ctrlKey || event.metaKey) && !event.shiftKey) {
+        event.preventDefault();
+        target.blur();
+      }
+    };
+    const onInput = () => fitText(el);
+    target.addEventListener("keydown", onKey);
+    target.addEventListener("input", onInput);
+    target.addEventListener("blur", () => {
+      target.removeEventListener("keydown", onKey);
+      target.removeEventListener("input", onInput);
+      target.contentEditable = "false";
+      el.classList.remove("mrp-editing");
+      const value = clean();
+      if (cancelled) target.textContent = original;
+      else if (value !== original) this.#commit([{ op: "set", kind: "items", id, data: { [name]: value } }]);
+      this.#root?.focus({ preventScroll: true });
+    }, { once: true });
+  }
+
+  #dblclick(id, event) {
+    const item = this.board.items?.[id];
+    if (!item) return;
+    if (["journal", "entity"].includes(item.type)) return this.#openRef(item);
+    if (!this.canEdit || this.#threadMode) return;
+    const name = event.target.closest?.("[data-field]")?.dataset.field;
+    if (item.type === "photo" && !name) return this.#chooseImage(id);
+    if (item.type === "mark") return this.#edit(id);
+    this.#startEdit(id, name ?? "text");
+  }
+
   /* ---------- teclado ---------- */
 
   #key(event) {
-    if (["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName)) return;
+    if (["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName) || event.target.isContentEditable) return;
     const mod = event.ctrlKey || event.metaKey;
     const key = event.key.toLowerCase();
     if (event.code === "Space") {
@@ -1283,6 +1628,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
       }
     } else if (event.key === "Escape") {
       this.#closeMenu();
+      this.#closeFlyout();
       this.#root.querySelector(".mrp-help").hidden = true;
       if (this.#threadMode) this.#tool("select");
       else this.#select([]);
@@ -1307,6 +1653,10 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     } else if (!mod && key === "v") this.#tool("select");
     else if (!mod && key === "h") this.#tool("hand");
     else if (!mod && key === "t" && this.canEdit) this.#tool("thread");
-    else if (event.key === "Enter" && event.target.classList.contains("mrp-item")) this.#activate(event.target.dataset.id);
+    else if (event.key === "Enter" && event.target.classList.contains("mrp-item")) {
+      const id = event.target.dataset.id;
+      if (this.#threadMode) this.#threadPick(id);
+      else this.#dblclick(id, { target: event.target });
+    }
   }
 }

@@ -9,12 +9,14 @@ Una **pizarra de investigación colaborativa** para Foundry VTT. Funciona en **c
 ## Cómo se usa
 
 1. En la pestaña **Diarios**, pulsa **Nueva pizarra** (o clic derecho sobre un diario → *Abrir como pizarra*). Cada pizarra es un diario, así que los permisos de siempre mandan: quien tenga Observador puede trabajar en ella.
-2. Con las herramientas de la izquierda cuelgas **notas, recortes, fotos, sellos y marcas**. Un clic derecho en una pieza abre su menú (editar, duplicar, ocultar, quitar…).
+2. Cada herramienta de la izquierda abre un desplegable con las variantes de su tipo (y **Aleatorio**): elige una y la pieza aparece lista para **escribir directamente sobre ella** (doble clic para volver a editar). «Editar detalles…» abre la ventana completa. Un clic derecho en una pieza abre su menú.
 3. **Selecciona** una pieza con un clic, varias con Mayús/Ctrl o con un recuadro arrastrando en vacío (Ctrl/Cmd+A, todas). Todo lo seleccionado se mueve junto; las **esquinas** de la caja lo escalan y el **círculo superior** lo gira, y los hilos se adaptan. Una barra sobre la selección ofrece girar, escalar, alinear, duplicar y más.
 4. **Arrastra desde la barra lateral** diarios, páginas, actores, escenas u objetos: quedan colgados y respetan los permisos de cada persona.
 5. **Quitar**: selecciona y pulsa **Suprimir**. **Ctrl/Cmd+Z** deshace cualquier cambio.
 6. **Hilo**: elige color y estilo, pulsa dos piezas y se unen. Un clic en el hilo permite ponerle etiqueta o quitarlo.
-7. **Fondo**: 20 fondos por ambientación (corcho, victoriano, casa maldita, Oeste, sala de guerra, ciberpunk, nave espacial…).
+7. **Fondo**: 19 fondos por ambientación (corcho, victoriano, casa maldita, Oeste, sala de guerra, ciberpunk, nave espacial…).
+8. **Sujeción por defecto** (barra superior): elige tipo, color y colocación del celo, las chinchetas o los clips para toda la pizarra; cada pieza o selección puede cambiarla desde su barra.
+9. **Accesibilidad** (barra superior): tamaño de texto, letra legible, alto contraste, reducir movimiento e interfaz grande; Tab recorre las piezas y los lectores de pantalla reciben avisos.
 
 ## Lo que ven los jugadores
 
