@@ -252,7 +252,18 @@ const FIELDS = {
     pin: NONE(TABLES.pin),
   },
   journal: { pinLayout: LAYOUT, pinColor: PINCOLOR, ratio, pin: NONE(TABLES.pin), mask: NONE(TABLES.mask) },
-  entity: { pinLayout: LAYOUT, pinColor: PINCOLOR, pin: NONE(TABLES.pin), frame: (v) => oneOf(v, TABLES.frame, "Marco") },
+  entity: {
+    name: (v) => clean(v, 120),
+    kind: (v) => (["", "Actor", "Scene", "Item", "RollTable"].includes(v) ? v : (() => { throw Error("Tipo de documento desconocido."); })()),
+    img: (v) => (v === "" || (IMAGE.test(String(v)) && !String(v).includes("..")) ? String(v) : (() => { throw Error("Imagen no permitida."); })()),
+    // Instantánea de nombre e imagen para mostrarla a quien no tiene permiso sobre el documento (solo la Guardiana la pone).
+    reveal: (v) => {
+      if (!v) return null;
+      const img = String(v.img ?? "");
+      if (img && (!IMAGE.test(img) || img.includes(".."))) throw Error("Imagen no permitida.");
+      return { name: clean(v.name, 120), img };
+    },
+    pinLayout: LAYOUT, pinColor: PINCOLOR, pin: NONE(TABLES.pin), frame: (v) => oneOf(v, TABLES.frame, "Marco") },
   stamp: { kind: (v) => oneOf(v, TABLES.stamp, "Sello"), text: (v) => clean(v, BOARD.labelMax) },
   mark: { kind: (v) => oneOf(v, TABLES.mark, "Marca") },
 };
@@ -267,7 +278,16 @@ const COMMON = {
 function cleanItem(data, existing, ctx) {
   const out = {};
   for (const key of Object.keys(data)) {
-    if (["type", "uuid"].includes(key)) continue;
+    if (key === "type") continue;
+    if (key === "uuid") {
+      // Una ficha sin vincular se enlaza después con un documento; una ya enlazada no cambia de documento.
+      if (data.uuid === existing.uuid) continue;
+      const match = UUID.exec(String(data.uuid));
+      if (existing.type !== "entity" || existing.uuid || !match || match[1] === "JournalEntry") throw Error("No se puede cambiar el documento enlazado.");
+      out.uuid = String(data.uuid);
+      continue;
+    }
+    if (key === "reveal" && !ctx.isGM) throw Error("Solo la Guardiana puede mostrar una ficha sin permiso.");
     if (key === "hidden") {
       if (!ctx.isGM) throw Error("Solo la Guardiana puede ocultar piezas.");
       out.hidden = Boolean(data.hidden);
@@ -316,7 +336,10 @@ export function planOps(board, ops, ctx) {
       if (!ITEM_TYPES.includes(data.type)) throw Error("Tipo de pieza desconocido.");
       if (Object.keys(work.items).length >= BOARD.maxItems) throw Error("La pizarra está llena.");
       const item = { type: data.type, x: 0, y: 0, z: 1 };
-      if (["journal", "entity"].includes(data.type)) {
+      if (data.type === "entity" && !data.uuid) {
+        if (!clean(data.name, 120).trim()) throw Error("Una ficha sin vincular necesita un nombre.");
+        item.uuid = "";
+      } else if (["journal", "entity"].includes(data.type)) {
         const match = UUID.exec(String(data.uuid));
         const isJournal = match?.[1] === "JournalEntry";
         if (!match || isJournal !== (data.type === "journal")) throw Error("Ese documento no se puede colgar aquí.");

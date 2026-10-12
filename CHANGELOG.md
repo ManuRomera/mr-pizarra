@@ -1,5 +1,14 @@
 # Cambios
 
+## 0.4.0 · Desvelar fichas e importar una pizarra con IA
+
+- **Fichas visibles sin dar permiso:** al colgar un actor, escena u objeto que algún jugador no puede ver, la Guardiana decide si mostrar su nombre e imagen a todos. Puede cambiarlo en cualquier momento desde el menú de la pieza («Mostrar nombre e imagen a todos» / «Dejar de mostrarlo sin permiso»). La Guardiana ve una insignia «Visible para todos». La pieza guarda una instantánea de nombre e imagen, porque quien no tiene permiso ni siquiera recibe el documento.
+- **Importar una pizarra** (botón «Importar» de la barra superior y del directorio de diarios): la ventana ofrece **un prompt completo** (copiar o descargar) para dárselo a una IA junto con la aventura. Explica cada tipo de pieza y cuándo usarla, qué se oculta y qué se ve al empezar, el significado de colores y estilos de hilo, cómo componer en el lienzo (3200 × 2000) y el formato JSON exacto, con todas las listas de ids válidas generadas desde el propio catálogo del módulo.
+- Se pega la respuesta de la IA (vale con el texto completo y su bloque de código) o se carga un archivo. **Revisar** muestra el resumen, qué fichas se vincularán por nombre y cuáles no, y los errores y avisos por elemento. Lo erróneo se omite; lo que no traiga posición se coloca en una cuadrícula.
+- **Destino:** añadir a la pizarra, reemplazar su contenido o crear una pizarra nueva. Opciones: vincular fichas por nombre con actores, escenas y objetos del mundo, **crear un diario por cada documento** (en una carpeta, sin permiso para los jugadores) y aplicar el fondo y la sujeción propuestos.
+- **Fichas sin vincular:** lo que no exista todavía en el mundo se coloca igualmente (nombre y silueta). Un **aviso en la barra superior** cuenta las fichas sin vincular y abre una lista donde se pueden localizar, **vincular** a un documento existente (con buscador) o **crear el actor** con ese nombre. También se vinculan con doble clic.
+- El prompt también está en `docs/prompt-ia.md`.
+
 ## 0.3.2 · Las puntas de los hilos, tras la sujeción
 
 - Los hilos siguen pasando por delante de las piezas, pero ahora las **chinchetas, el celo, los clips y las grapas quedan por encima del hilo**: las puntas se ven sujetas por ellas. Las sujeciones van en una capa propia y siguen a su pieza al moverla, escalarla o girarla (conservan su tamaño fijo).

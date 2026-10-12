@@ -102,7 +102,7 @@ function textBox(maskId, w, ratio, g, minTop = 0) {
 
 export function resolveItem(item) {
   if (item.type === "journal") return resolveJournal(item.uuid);
-  if (item.type === "entity") return resolveEntity(item.uuid);
+  if (item.type === "entity") return resolveEntity(item);
   return null;
 }
 
@@ -188,12 +188,14 @@ export function renderItem(id, item, board = {}) {
   const editable = TEXT_TYPES.has(item.type) && game.user.isGM !== undefined;
   const badges = [
     item.hidden ? `<span class="mrp-badge mrp-badge-hidden"><i class="fa-solid fa-eye-slash"></i> ${t("hiddenBadge")}</span>` : "",
+    item.type === "entity" && game.user.isGM && !item.uuid ? `<span class="mrp-badge mrp-badge-pending"><i class="fa-solid fa-link-slash"></i> ${t("unlinkedBadge")}</span>` : "",
+    item.type === "entity" && game.user.isGM && item.reveal ? `<span class="mrp-badge mrp-badge-shown"><i class="fa-solid fa-eye"></i> ${t("shownBadge")}</span>` : "",
     item.owner ? `<span class="mrp-badge mrp-badge-private"><i class="fa-solid fa-lock"></i> ${t("privateBadge")}${game.user.isGM ? ` · ${esc(game.users.get(item.owner)?.name ?? "")}` : ""}</span>` : "",
   ].join("");
   const label = esc(item.title || item.text || ref?.title || t(item.type)).slice(0, 80);
   const html = `<div class="mrp-item mrp-t-${item.type} ${item.hidden ? "mrp-hidden" : ""} ${item.type === "mark" && TABLES.mark.get(item.kind)?.multiply ? "mrp-multiply" : ""}" data-id="${id}" data-type="${item.type}" data-ax="${g.anchor.x.toFixed(1)}" data-ay="${g.anchor.y.toFixed(1)}" data-rot="${L.rot}" data-pins="${esc(JSON.stringify(pinSpecs(g, L.color)))}" tabindex="0" role="group" aria-label="${t(item.type)}: ${label}"
     style="left:${item.x}px;top:${item.y}px;width:${w}px;z-index:${item.z};--w:${w}px">
     <div class="mrp-lift" style="transform:rotate(${L.rot}deg) skewX(${L.skew}deg)">${inner(id, item, ref, L, w, g, editable)}</div>
-    ${badges}</div>`;
+    ${badges ? `<div class="mrp-badges">${badges}</div>` : ""}</div>`;
   return { html, sig: `${JSON.stringify(item)}|${JSON.stringify(preset)}|${ref?.sig ?? ""}|${game.user.isGM}` };
 }

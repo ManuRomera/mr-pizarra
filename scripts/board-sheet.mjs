@@ -349,6 +349,8 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
         <header class="mrp-topbar">
           <div class="mrp-title"><span class="mrp-badge-logo"><i class="fa-solid fa-thumbtack"></i></span><div><strong class="mrp-name"></strong><small class="mrp-meta"></small></div></div>
           <div class="mrp-chips">
+            ${game.user.isGM ? `<button type="button" class="mrp-chip mrp-chip-warn" data-act="pending" aria-haspopup="dialog" hidden><i class="fa-solid fa-link-slash"></i><span class="mrp-pendingcount"></span></button>
+            <button type="button" class="mrp-chip" data-act="import" data-tooltip="${esc(t("importTip"))}"><i class="fa-solid fa-file-import"></i><span>${esc(t("importShort"))}</span></button>` : ""}
             <button type="button" class="mrp-chip" data-act="pins" aria-haspopup="dialog" data-tooltip="${esc(t("pinPreset"))}"><i class="fa-solid fa-thumbtack"></i><span class="mrp-pinlabel"></span></button>
             <button type="button" class="mrp-chip" data-act="bg"><i class="fa-solid fa-palette"></i><span class="mrp-bgname"></span></button>
             ${game.user.isGM ? `<button type="button" class="mrp-chip" data-act="lock"><i class="fa-solid fa-lock-open"></i><span>${esc(t("lock"))}</span></button>` : ""}
@@ -436,6 +438,8 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     else if (act === "fit") this.#fit();
     else if (act === "zoom100") this.#zoomAt(1 / this.#view.k, cx, cy);
     else if (act === "bg") this.#tool("bg");
+    else if (act === "import") game.modules.get(ID).api.importBoard(this.document);
+    else if (act === "pending") this.#toggleFlyout("pending", () => this.#pendingFlyout(event.target.closest("button")));
     else if (act === "pins") this.#toggleFlyout("pin-board", () => this.#pinFlyout(event.target.closest("button"), "board"));
     else if (act === "a11y") this.#toggleFlyout("a11y", () => this.#a11yFlyout(event.target.closest("button")));
     else if (act === "lock") this.#tool("lock");
@@ -519,6 +523,12 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     this.#root.querySelector(".mrp-name").textContent = this.document.name;
     this.#root.querySelector(".mrp-bgname").textContent = bg.name;
     this.#root.querySelector(".mrp-pinlabel").textContent = this.#pinLabel();
+    const pending = this.#pending();
+    const chip = this.#root.querySelector("[data-act=pending]");
+    if (chip) {
+      chip.hidden = !pending.length;
+      chip.querySelector(".mrp-pendingcount").textContent = `${pending.length} ${t("unlinkedWord")}`;
+    }
     const container = this.#root.querySelector(".mrp-items");
     const seen = new Set();
     for (const [id, item] of Object.entries(board.items ?? {})) {
@@ -1205,12 +1215,128 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     if (data?.background) this.#commit([{ op: "set", kind: "settings", id: uid(), data: { background: data.background } }]);
   }
 
-  #addRef(uuid, point) {
+  /** Cuelga un documento. Si es una ficha que algún jugador no puede ver, la Guardiana decide si mostrar su nombre e imagen a todos. */
+  async #addRef(uuid, point) {
     const match = /^(JournalEntry|Actor|Scene|Item|RollTable)\./.exec(uuid);
     if (!match) return ui.notifications.warn(t("dropUnsupported"));
     const type = match[1] === "JournalEntry" ? "journal" : "entity";
     const w = widthOf({ type });
-    return this.#commit([{ op: "set", kind: "items", id: uid(), data: { type, uuid, x: Math.round(point.x - w / 2), y: Math.round(point.y - w / 2), z: this.#topZ() + 1 } }]);
+    const data = { type, uuid, x: Math.round(point.x - w / 2), y: Math.round(point.y - w / 2), z: this.#topZ() + 1 };
+    if (type === "entity" && game.user.isGM) {
+      const doc = await fromUuid(uuid);
+      if (doc && game.users.some((u) => !u.isGM && !doc.testUserPermission(u, "OBSERVER"))) {
+        const show = await foundry.applications.api.DialogV2.confirm({
+          window: { title: t("revealTitle"), icon: "fa-solid fa-eye" },
+          content: `<p>${t("revealAsk").replace("{name}", `<strong>${esc(doc.name)}</strong>`)}</p><p class="hint">${t("revealHint")}</p>`,
+          yes: { label: t("revealYes"), icon: "fa-solid fa-eye" },
+          no: { label: t("revealNo"), icon: "fa-solid fa-eye-slash" },
+          rejectClose: false,
+        });
+        if (show) data.reveal = this.#snapshot(doc);
+      }
+    }
+    return this.#commit([{ op: "set", kind: "items", id: uid(), data }]);
+  }
+
+  /** Nombre e imagen de un documento para mostrarlos a quien no tiene permiso sobre él. */
+  #snapshot(doc) {
+    const img = String((doc.documentName === "Scene" ? (doc.thumb ?? doc.background?.src) : doc.img) ?? "");
+    return { name: doc.name, img: /\.(png|jpe?g|webp|gif|avif|svg)(\?[^\s"'<>]*)?$/i.test(img) && !img.includes("..") ? img : "" };
+  }
+
+  async #toggleReveal(id) {
+    const item = this.board.items[id];
+    if (!item) return;
+    if (item.reveal) return this.#commit([{ op: "set", kind: "items", id, data: { reveal: null } }]);
+    const doc = item.uuid ? await fromUuid(item.uuid) : null;
+    const reveal = doc ? this.#snapshot(doc) : { name: item.name ?? "", img: item.img ?? "" };
+    this.#commit([{ op: "set", kind: "items", id, data: { reveal } }]);
+    this.#say(t("shownBadge"));
+  }
+
+  /* ---------- fichas sin vincular ---------- */
+
+  #pending() {
+    return Object.entries(this.board.items ?? {}).filter(([, i]) => i.type === "entity" && !i.uuid).map(([id, i]) => ({ id, ...i }));
+  }
+
+  #pendingFlyout(anchor) {
+    const rows = this.#pending().map((p) => `<div class="mrp-pendrow" data-id="${p.id}"><div><strong>${esc(p.name)}</strong><small>${esc(p.kind ? t(`kind${p.kind}`) : t("kindUnknown"))}${p.hidden ? ` · ${esc(t("hiddenBadge"))}` : ""}</small></div>
+      <button type="button" data-p="locate" data-tooltip="${esc(t("locate"))}" aria-label="${esc(t("locate"))}"><i class="fa-solid fa-location-crosshairs"></i></button>
+      <button type="button" data-p="link" data-tooltip="${esc(t("linkDoc"))}" aria-label="${esc(t("linkDoc"))}"><i class="fa-solid fa-link"></i></button>
+      ${!p.kind || p.kind === "Actor" ? `<button type="button" data-p="create" data-tooltip="${esc(t("createActor"))}" aria-label="${esc(t("createActor"))}"><i class="fa-solid fa-user-plus"></i></button>` : ""}</div>`).join("");
+    this.#flyout(anchor, t("unlinkedTitle"), `<p class="mrp-fly-note">${esc(t("unlinkedHint"))}</p>${rows || `<p class="mrp-fly-note">${esc(t("allLinked"))}</p>`}`, {
+      side: "below",
+      key: "pending",
+      mount: (box) =>
+        box.addEventListener("click", (event) => {
+          const b = event.target.closest("[data-p]");
+          const id = b?.closest("[data-id]")?.dataset.id;
+          if (!b || !id) return;
+          if (b.dataset.p === "locate") return this.#locate(id);
+          if (b.dataset.p === "link") return this.#linkFlyout(id, box);
+          if (b.dataset.p === "create") return this.#createActorFor(id);
+        }),
+    });
+  }
+
+  #locate(id) {
+    const el = this.#el(id);
+    if (!el) return;
+    this.#select([id]);
+    this.#centerOn(el.offsetLeft + el.offsetWidth / 2, el.offsetTop + el.offsetHeight / 2);
+  }
+
+  /** Lista de documentos existentes para vincular una ficha (actores, escenas, objetos, tablas) con buscador. */
+  #linkFlyout(id, from) {
+    const item = this.board.items[id];
+    if (!item) return;
+    const sources = { Actor: game.actors, Scene: game.scenes, Item: game.items, RollTable: game.tables };
+    const kinds = item.kind ? [item.kind] : ["Actor", "Scene", "Item", "RollTable"];
+    const entries = kinds.flatMap((k) => (sources[k]?.contents ?? []).map((d) => ({ k, name: d.name, uuid: d.uuid })));
+    let group = null;
+    const rows = entries.map((e) => {
+      const head = e.k !== group ? `<h5 class="mrp-group">${esc(t(`kind${e.k}`))}</h5>` : "";
+      group = e.k;
+      return `${head}<button type="button" class="mrp-doc" data-uuid="${e.uuid}" data-q="${esc(e.name.toLowerCase())}"><i class="fa-solid fa-link"></i> ${esc(e.name)}</button>`;
+    });
+    const anchor = from?.parentElement ? this.#root.querySelector("[data-act=pending]") ?? this.#el(id) : this.#el(id);
+    this.#flyout(anchor, `${t("linkDoc")}: ${item.name}`, `<input type="search" class="mrp-search" value="${esc(item.name)}" aria-label="${esc(t("search"))}"><div class="mrp-doclist">${rows.join("") || `<p class="mrp-fly-note">${esc(t("noDocs"))}</p>`}</div>`, {
+      side: "below",
+      key: "link",
+      mount: (box) => {
+        const filter = () => {
+          const q = box.querySelector(".mrp-search").value.trim().toLowerCase();
+          box.querySelectorAll(".mrp-doc").forEach((b) => (b.hidden = Boolean(q) && !b.dataset.q.includes(q)));
+        };
+        box.querySelector(".mrp-search").addEventListener("input", filter);
+        filter();
+        box.addEventListener("click", (event) => {
+          const uuid = event.target.closest("[data-uuid]")?.dataset.uuid;
+          if (!uuid) return;
+          this.#closeFlyout();
+          this.#commit([{ op: "set", kind: "items", id, data: { uuid } }]);
+          this.#say(t("linked"));
+        });
+      },
+    });
+  }
+
+  async #createActorFor(id) {
+    const item = this.board.items[id];
+    const types = (Actor.TYPES ?? []).filter((x) => x !== "base");
+    if (!item || !types.length) return ui.notifications.warn(t("noActorTypes"));
+    const label = (x) => game.i18n.localize(CONFIG.Actor.typeLabels?.[x] ?? x);
+    const data = await foundry.applications.api.DialogV2.input({
+      window: { title: t("createActor"), icon: "fa-solid fa-user-plus" },
+      position: { width: 420 },
+      content: `<div class="form-group"><label>${esc(t("actorType"))}</label><div class="form-fields"><select name="type">${types.map((x) => `<option value="${x}">${esc(label(x))}</option>`).join("")}</select></div></div><p class="hint">${esc(t("createActorHint"))}</p>`,
+      ok: { label: t("create"), icon: "fa-solid fa-check" },
+      rejectClose: false,
+    });
+    if (!data) return;
+    const actor = await Actor.create({ name: item.name, type: data.type, ownership: { default: 0 } });
+    if (actor) this.#commit([{ op: "set", kind: "items", id, data: { uuid: actor.uuid } }]);
   }
 
   #drop(event) {
@@ -1295,7 +1421,10 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     const allHidden = ids.every((i) => this.board.items[i].hidden);
     const allPrivate = ids.every((i) => this.board.items[i].owner);
     this.#menu(event, [
-      !multi && isRef && { icon: "fa-regular fa-folder-open", label: t("openDoc"), fn: () => this.#openRef(item) },
+      !multi && isRef && item.uuid && { icon: "fa-regular fa-folder-open", label: t("openDoc"), fn: () => this.#openRef(item) },
+      !multi && game.user.isGM && item.type === "entity" && !item.uuid && { icon: "fa-solid fa-link", label: t("linkDoc"), fn: () => this.#linkFlyout(id) },
+      !multi && game.user.isGM && item.type === "entity" && !item.uuid && (!item.kind || item.kind === "Actor") && { icon: "fa-solid fa-user-plus", label: t("createActor"), fn: () => this.#createActorFor(id) },
+      !multi && game.user.isGM && item.type === "entity" && { icon: item.reveal ? "fa-solid fa-eye-slash" : "fa-solid fa-eye", label: t(item.reveal ? "unrevealEntity" : "revealEntity"), fn: () => this.#toggleReveal(id) },
       !multi && edit && item.type !== "mark" && !isRef && { icon: "fa-solid fa-i-cursor", label: t("editText"), fn: () => this.#startEdit(id, item.type === "clipping" ? "title" : "text") },
       !multi && edit && { icon: "fa-solid fa-sliders", label: t("editDetails"), fn: () => this.#edit(id) },
       edit && { icon: "fa-solid fa-thumbtack", label: t("decoration"), fn: () => this.#pinFlyout(this.#root.querySelector(".mrp-selbar button[data-act=pins]") ?? this.#root.querySelector("[data-act=pins]"), "selection") },
@@ -1343,6 +1472,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
   }
 
   async #openRef(item) {
+    if (!item.uuid) return ui.notifications.info(t("notLinkedYet"));
     const doc = await fromUuid(item.uuid);
     if (!doc || !(game.user.isGM || doc.testUserPermission(game.user, "OBSERVER"))) return ui.notifications.warn(t("noPermission"));
     if (doc.documentName === "JournalEntryPage") return doc.parent.sheet.render({ force: true, pageId: doc.id });
@@ -1650,6 +1780,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
   #dblclick(id, event) {
     const item = this.board.items?.[id];
     if (!item) return;
+    if (item.type === "entity" && !item.uuid && game.user.isGM) return this.#linkFlyout(id);
     if (["journal", "entity"].includes(item.type)) return this.#openRef(item);
     if (!this.canEdit || this.#threadMode) return;
     const name = event.target.closest?.("[data-field]")?.dataset.field;

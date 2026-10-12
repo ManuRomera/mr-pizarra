@@ -1,6 +1,6 @@
 {
   "name": "mr-pizarra",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "MR- Pizarra: pizarra de investigación colaborativa para Foundry VTT.",
@@ -8,7 +8,8 @@
     "test": "node --test tests/*.test.mjs",
     "lang": "node tools/gen-lang.mjs",
     "assets": "python3 tools/prepare-assets.py",
-    "zip": "mkdir -p dist && rm -f dist/mr-pizarra.zip && zip -qr dist/mr-pizarra.zip module.json scripts styles lang assets LICENSE README.md CHANGELOG.md -x '*.DS_Store' && node tools/check-zip.mjs"
+    "zip": "mkdir -p dist && rm -f dist/mr-pizarra.zip && zip -qr dist/mr-pizarra.zip module.json scripts styles lang assets LICENSE README.md CHANGELOG.md -x '*.DS_Store' && node tools/check-zip.mjs",
+    "prompt": "node tools/gen-prompt.mjs"
   },
   "engines": {
     "node": ">=20.11"

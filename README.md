@@ -18,6 +18,14 @@ Una **pizarra de investigación colaborativa** para Foundry VTT. Funciona en **c
 8. **Sujeción por defecto** (barra superior): elige tipo, color y colocación del celo, las chinchetas o los clips para toda la pizarra; cada pieza o selección puede cambiarla desde su barra.
 9. **Accesibilidad** (barra superior): tamaño de texto, letra legible, alto contraste, reducir movimiento e interfaz grande; Tab recorre las piezas y los lectores de pantalla reciben avisos.
 
+## Importar una pizarra con una IA
+
+1. En la barra superior (o en el directorio de diarios) pulsa **Importar**.
+2. **Copia el prompt**, pégalo en tu IA favorita y adjunta la aventura. La IA extrae personas, lugares, pistas, documentos y conexiones, elige cómo representar cada cosa y los coloca en un JSON.
+3. **Pega la respuesta**, pulsa **Revisar** (te dice qué se vinculará y qué problemas hay) e **Importa**: a esta pizarra, reemplazándola o en una nueva.
+
+Las piezas que la IA marca como ocultas arrancan ocultas para los jugadores y las vas **revelando** con un clic. Los actores, escenas y objetos que no existan todavía quedan como **fichas sin vincular**: un aviso en la barra superior las lista para localizarlas, vincularlas o crear el actor. Los documentos se crean como diarios sin permiso para los jugadores. El prompt también está en [`docs/prompt-ia.md`](docs/prompt-ia.md).
+
 ## Lo que ven los jugadores
 
 | Permiso sobre el documento | Qué aparece en la pizarra |
@@ -26,7 +34,7 @@ Una **pizarra de investigación colaborativa** para Foundry VTT. Funciona en **c
 | Limitado | Solo el título; el texto sale censurado con barras y un sello «RESERVADO». |
 | Ninguno | Un sobre con «?», sin nombre. |
 
-Si subes el permiso del diario, la pieza se revela sola.
+Si subes el permiso del diario, la pieza se revela sola. Para **actores, escenas y objetos** hay otra vía: la Guardiana puede **mostrar el nombre y la imagen a todos sin dar permiso** sobre la ficha (se le pregunta al colgarla y se cambia cuando quiera desde el menú de la pieza).
 
 ## Para la Guardiana
 

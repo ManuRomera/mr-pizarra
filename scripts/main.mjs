@@ -5,19 +5,20 @@
  */
 import { ID, FLAG, BACKGROUNDS } from "./rules.mjs";
 import { BoardSheet, registerSocket } from "./board-sheet.mjs";
+import { ImportApp } from "./import-app.mjs";
 import { loadManifest, t, esc } from "./util.mjs";
 
 const SHEET = `${ID}.BoardSheet`;
 const OBSERVER = () => CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER;
 
 /** Crea un diario-pizarra y lo abre. */
-export async function createBoard(name, { background = "corcho-claro", share = false } = {}) {
+export async function createBoard(name, { background = "corcho-claro", share = false, open = true } = {}) {
   const doc = await JournalEntry.create({
     name: name || t("newBoardName"),
     ownership: { default: share ? OBSERVER() : 0 },
     flags: { core: { sheetClass: SHEET }, [ID]: { board: { background, items: {}, links: {}, locked: false } } },
   });
-  doc?.sheet.render({ force: true });
+  if (open) doc?.sheet.render({ force: true });
   return doc;
 }
 
@@ -55,6 +56,8 @@ Hooks.once("ready", async () => {
   game.modules.get(ID).api = {
     createBoard,
     convertToBoard,
+    /** Abre la ventana de importación de una pizarra (de una IA o de un archivo); sin pizarra, crea una nueva. */
+    importBoard: (doc = null) => new ImportApp({ doc, createBoard }).render({ force: true }),
     /** Abre una pizarra por id, nombre o documento. */
     open(ref) {
       const doc = typeof ref === "string" ? (game.journal.get(ref) ?? game.journal.getName(ref)) : ref;
@@ -73,7 +76,16 @@ Hooks.on("renderJournalDirectory", (app, html) => {
     button.className = "mrp-new";
     button.innerHTML = `<i class="fa-solid fa-thumbtack"></i> ${t("newBoard")}`;
     button.addEventListener("click", askNewBoard);
-    (root.querySelector(".header-actions") ?? root.querySelector(".directory-header"))?.append(button);
+    const host = root.querySelector(".header-actions") ?? root.querySelector(".directory-header");
+    host?.append(button);
+    if (game.user.isGM) {
+      const imp = document.createElement("button");
+      imp.type = "button";
+      imp.className = "mrp-new";
+      imp.innerHTML = `<i class="fa-solid fa-file-import"></i> ${t("importShort")}`;
+      imp.addEventListener("click", () => game.modules.get(ID).api.importBoard(null));
+      host?.append(imp);
+    }
   }
   for (const li of root.querySelectorAll(".directory-item[data-entry-id]")) {
     if (!game.journal.get(li.dataset.entryId)?.getFlag(ID, "board") || li.querySelector(".mrp-dir-icon")) continue;

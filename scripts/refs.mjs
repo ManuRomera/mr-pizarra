@@ -29,13 +29,23 @@ export function resolveJournal(uuid) {
   return { level, title, kind: "text", body: "", sig };
 }
 
-/** Actor, escena, objeto o tabla. */
-export function resolveEntity(uuid) {
-  const doc = fromUuidSync(uuid, { strict: false });
-  if (!doc?.documentName) return { level: "none", missing: !doc, sig: `none:${Boolean(doc)}` };
-  const level = levelOf(doc);
-  const img = doc.documentName === "Scene" ? (doc.thumb ?? doc.background?.src) : doc.img;
-  const sig = `${level}|${doc.name}|${img}`;
-  if (level === "none") return { level, sig };
-  return { level, title: doc.name, src: level === "full" ? img : null, sig };
+/**
+ * Actor, escena, objeto o tabla. Tres casos especiales:
+ *  - sin vincular (`uuid` vacío): solo hay un nombre; se pinta con silueta (el master la vincula después).
+ *  - desvelada (`reveal`): la Guardiana guardó nombre e imagen para mostrarlos a quien no tiene permiso sobre el documento
+ *    (esa persona ni siquiera recibe el documento, por eso hace falta la instantánea).
+ */
+export function resolveEntity(item) {
+  if (!item.uuid) return { level: "pending", title: item.name ?? "", src: item.img || null, sig: `pending|${item.name}|${item.img}` };
+  const doc = fromUuidSync(item.uuid, { strict: false });
+  const level = doc?.documentName ? levelOf(doc) : "none";
+  const reveal = item.reveal;
+  if (level === "full") {
+    const img = doc.documentName === "Scene" ? (doc.thumb ?? doc.background?.src) : doc.img;
+    return { level, title: doc.name, src: img, sig: `${level}|${doc.name}|${img}` };
+  }
+  if (reveal) return { level: "revealed", title: reveal.name, src: reveal.img || null, sig: `rev|${reveal.name}|${reveal.img}` };
+  if (!doc?.documentName) return { level: "none", missing: true, sig: "none:false" };
+  if (level === "none") return { level, sig: "none:true" };
+  return { level, title: doc.name, src: null, sig: `${level}|${doc.name}` };
 }

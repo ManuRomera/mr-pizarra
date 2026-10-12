@@ -125,6 +125,25 @@ test("fotos: se pueden crear sin imagen y rellenarla después", () => {
   assert.throws(() => planOps({}, [op(ID1, { type: "photo", src: "no-imagen" })], PL), /Imagen/);
 });
 
+test("fichas sin vincular: se crean con nombre, se enlazan después y no cambian de documento", () => {
+  assert.throws(() => planOps({}, [op(ID1, { type: "entity" })], GM), /nombre/);
+  const board = planOps({}, [op(ID1, { type: "entity", name: "Eleanor Voss", kind: "Actor" })], GM).board;
+  assert.equal(board.items[ID1].uuid, "");
+  const actor = "Actor.abcdefghijklmnop";
+  const linked = planOps(board, [op(ID1, { uuid: actor })], GM).board;
+  assert.equal(linked.items[ID1].uuid, actor);
+  assert.throws(() => planOps(linked, [op(ID1, { uuid: "Actor.zzzzzzzzzzzzzzzz" })], GM), /No se puede cambiar/);
+  assert.throws(() => planOps(board, [op(ID1, { uuid: "JournalEntry.abcdefghijklmnop" })], GM), /No se puede cambiar/);
+});
+
+test("mostrar una ficha sin permiso: solo la Guardiana, con instantánea de nombre e imagen", () => {
+  const board = planOps({}, [op(ID1, { type: "entity", name: "X", reveal: { name: "Eleanor Voss", img: "icons/svg/mystery-man.svg" } })], GM).board;
+  assert.equal(board.items[ID1].reveal.name, "Eleanor Voss");
+  assert.throws(() => planOps(board, [op(ID1, { reveal: { name: "Y", img: "" } })], PL), /Guardiana/);
+  assert.throws(() => planOps(board, [op(ID1, { reveal: { name: "Y", img: "../x.png" } })], GM), /Imagen/);
+  assert.equal(planOps(board, [op(ID1, { reveal: null })], GM).board.items[ID1].reveal, null);
+});
+
 test("catálogo: ids únicos y cada imagen existe en assets (si ya se generaron)", () => {
   for (const table of [BACKGROUNDS, PAPERS, MASKS, PINS]) assert.equal(new Set(table.map((e) => e.id)).size, table.length);
   const manifest = new URL("../assets/manifest.json", import.meta.url);

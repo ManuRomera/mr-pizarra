@@ -24,6 +24,10 @@ Módulo de Foundry VTT (v13+, probado en 13.351) independiente del sistema. Id `
 - Accesibilidad: ajuste de cliente `a11y` (clases `mrp-legible`, `mrp-hc`, `mrp-calm`, `mrp-bigui`, variable `--tscale`). `zoom` CSS en la interfaz grande obliga a dividir posiciones por el zoom (`#place`).
 - Fondos: los del generador están reflejados en espejo. El mapa antiguo se retiró (sin resolución); el pergamino se genera con ruido periódico en `prepare-assets.py`; los periódicos también (los del zip traían texto fantasma).
 
+## Fichas sin vincular, desvelar e importar
+- `entity` puede ser **sin vincular** (`uuid: ""`, con `name`/`kind`/`img`) y enlazarse después (`uuid` solo se puede poner una vez). `reveal: {name, img}` (solo la Guardiana) es una instantánea para mostrar la ficha a quien no tiene permiso: esa persona no recibe el documento, así que no se puede leer en vivo (`refs.resolveEntity`).
+- `scripts/import.mjs` es puro y testeado: `parseImport` (saca el JSON de vallas/texto), `normalizeImport` (valida; errores omiten, avisos corrigen; coloca en cuadrícula lo que no traiga x/y) y `buildPrompt` (se genera desde el catálogo de rules.mjs: añadir un papel/sello nuevo lo incluye solo; hay un test que valida el ejemplo del propio prompt). `import-app.mjs` hace lo que necesita Foundry: vincular por nombre exacto, crear diarios, validar cada operación con `planOps` y enviar por lotes. `npm run prompt` regenera `docs/prompt-ia.md`.
+
 ## Datos
 `flags.mr-pizarra.board` en un JournalEntry: `{background, locked, items:{id:{type,x,y,z,…}}, links:{id:{from,to,color,style,label}}}`. Una clave por pieza: nunca se reescribe el objeto entero.
 
