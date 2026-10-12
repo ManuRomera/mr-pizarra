@@ -28,6 +28,13 @@ Módulo de Foundry VTT (v13+, probado en 13.351) independiente del sistema. Id `
 - `entity` puede ser **sin vincular** (`uuid: ""`, con `name`/`kind`/`img`) y enlazarse después (`uuid` solo se puede poner una vez). `reveal: {name, img}` (solo la Guardiana) es una instantánea para mostrar la ficha a quien no tiene permiso: esa persona no recibe el documento, así que no se puede leer en vivo (`refs.resolveEntity`).
 - `scripts/import.mjs` es puro y testeado: `parseImport` (saca el JSON de vallas/texto), `normalizeImport` (valida; errores omiten, avisos corrigen; coloca en cuadrícula lo que no traiga x/y) y `buildPrompt` (se genera desde el catálogo de rules.mjs: añadir un papel/sello nuevo lo incluye solo; hay un test que valida el ejemplo del propio prompt). `import-app.mjs` hace lo que necesita Foundry: vincular por nombre exacto, crear diarios, validar cada operación con `planOps` y enviar por lotes. `npm run prompt` regenera `docs/prompt-ia.md`.
 
+## Capas, caminos y caja
+- Visibilidad (`rules.isVisibleTo`): la Guardiana ve todo; el resto no ve `hidden`, privadas ajenas ni piezas de una **capa sin revelar** salvo que tengan `shown` (lo pone «revelar» desde un camino). `board.layers = {id:{name,color,revealed,order}}`; borrar una capa deja sus piezas sin capa. `forbidden()` de planOps usa la misma función: nadie edita lo que no ve.
+- `pathFrom(board, id)` (puro, testeado) hace el recorrido por hilos por niveles. El panel de capas/caminos (`#layersFlyout`) se repinta desde `refresh` mientras está abierto.
+- Caja: `item.box = true` (no se pinta en el lienzo; sí en `#boxFlyout`), `item.group` organiza las secciones. Sacar/guardar es `box:false/true`; cualquiera con permiso lo puede hacer con lo que ve.
+- Importación: `mode: "board"|"box"` + `layers[]` + `items[].layer/group`; `buildPrompt({mode})` genera un prompt por modo.
+- Trampas: `#flyout` debe fijar `#flyoutKey` **antes** de montar; los paneles se recolocan tras cada repintado (`#placeFlyout`) porque su alto cambia.
+
 ## Datos
 `flags.mr-pizarra.board` en un JournalEntry: `{background, locked, items:{id:{type,x,y,z,…}}, links:{id:{from,to,color,style,label}}}`. Una clave por pieza: nunca se reescribe el objeto entero.
 

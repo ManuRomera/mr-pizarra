@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { planOps, look, rng, TABLES, BACKGROUNDS, PAPERS, MASKS, PINS, FLAG, AUTO_MASKS } from "../scripts/rules.mjs";
+import { planOps, isVisibleTo, pathFrom, LAYER_COLORS, look, rng, TABLES, BACKGROUNDS, PAPERS, MASKS, PINS, FLAG, AUTO_MASKS } from "../scripts/rules.mjs";
 import { readFileSync, existsSync } from "node:fs";
 
 const GM = { isGM: true, userId: "gm0000000000" };
@@ -142,6 +142,49 @@ test("mostrar una ficha sin permiso: solo la Guardiana, con instantánea de nomb
   assert.throws(() => planOps(board, [op(ID1, { reveal: { name: "Y", img: "" } })], PL), /Guardiana/);
   assert.throws(() => planOps(board, [op(ID1, { reveal: { name: "Y", img: "../x.png" } })], GM), /Imagen/);
   assert.equal(planOps(board, [op(ID1, { reveal: null })], GM).board.items[ID1].reveal, null);
+});
+
+test("capas: la Guardiana las crea, asigna y revela; las piezas de una capa oculta no se ven", () => {
+  const LY = "llllllllllllllll";
+  assert.throws(() => planOps({}, [op(LY, { name: "Acto I" }, "layers")], PL), /Guardiana/);
+  let board = planOps({}, [op(LY, { name: "Acto I" }, "layers"), op(ID1, { type: "note", layer: LY })], GM).board;
+  assert.equal(board.layers[LY].revealed, false);
+  assert.equal(board.layers[LY].color, LAYER_COLORS[0]);
+  assert.equal(isVisibleTo(board.items[ID1], board, GM), true);
+  assert.equal(isVisibleTo(board.items[ID1], board, PL), false);
+  assert.throws(() => planOps(board, [op(ID1, { x: 5 })], PL), /No puedes/);
+  assert.throws(() => planOps(board, [op(ID1, { layer: "" })], PL), /No puedes|Guardiana/);
+  assert.throws(() => planOps(board, [op(ID2, { type: "note", layer: "zzzzzzzzzzzzzzzz" })], GM), /no existe/);
+  board = planOps(board, [op(LY, { revealed: true }, "layers")], GM).board;
+  assert.equal(isVisibleTo(board.items[ID1], board, PL), true);
+  // una pieza «mostrada» a propósito se ve aunque su capa siga oculta
+  board = planOps(board, [op(LY, { revealed: false }, "layers"), op(ID1, { shown: true })], GM).board;
+  assert.equal(isVisibleTo(board.items[ID1], board, PL), true);
+  assert.equal(isVisibleTo({ ...board.items[ID1], hidden: true }, board, PL), false);
+  // borrar la capa libera sus piezas
+  const gone = planOps(board, [{ op: "remove", kind: "layers", id: LY }], GM);
+  assert.equal(gone.board.items[ID1].layer, "");
+  assert.equal(gone.update[`${FLAG}.items.${ID1}.layer`], "");
+  assert.throws(() => planOps({}, Array.from({ length: 13 }, (_, i) => op(`l${String(i).padStart(15, "0")}`, {}, "layers")), GM), /demasiadas/);
+});
+
+test("caminos: piezas unidas por hilos, por niveles y de izquierda a derecha", () => {
+  const items = Object.fromEntries(["A", "B", "C", "D", "E"].map((n, i) => [n.repeat(10), { type: "note", x: [0, 600, 300, 900, 50][i], y: 0 }]));
+  const [A, B, C, D, E] = Object.keys(items);
+  const links = { l1: { from: A, to: B, color: "rojo", style: "solido", label: "uno" }, l2: { from: A, to: C, color: "azul", style: "solido" }, l3: { from: B, to: D, color: "rojo", style: "solido" } };
+  const path = pathFrom({ items, links }, A);
+  assert.deepEqual(path.map((p) => [p.id === C ? "C" : p.id === B ? "B" : "D", p.dist]), [["C", 1], ["B", 1], ["D", 2]]);
+  assert.equal(path[1].link.label, "uno");
+  assert.equal(path.some((p) => p.id === E), false, "una pieza sin hilos no está en el camino");
+  assert.deepEqual(pathFrom({ items, links }, "zzzzzzzzzz"), []);
+});
+
+test("caja: cualquiera puede guardar y sacar una pieza visible; la agrupa por grupos", () => {
+  let board = planOps({}, [op(ID1, { type: "note", box: true, group: "Pistas" })], GM).board;
+  assert.equal(board.items[ID1].box, true);
+  board = planOps(board, [op(ID1, { box: false, x: 400, y: 300 })], PL).board;
+  assert.deepEqual([board.items[ID1].box, board.items[ID1].x], [false, 400]);
+  assert.equal(planOps(board, [op(ID1, { group: "x".repeat(99) })], PL).board.items[ID1].group.length, 30);
 });
 
 test("catálogo: ids únicos y cada imagen existe en assets (si ya se generaron)", () => {

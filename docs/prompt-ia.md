@@ -10,57 +10,67 @@ Lee la aventura y extrae, sin inventar nada que no esté en ella (si algo es amb
 4. **Pistas**: cada pista con qué revela y dónde se encuentra.
 5. **Documentos** que existen en la aventura (cartas, informes, diarios, recortes de prensa, telegramas): piezas `journal` (se crea el documento con su texto completo) o `clipping` (el texto aparece directamente en un recorte).
 6. **Hechos y cronología**: qué pasó y cuándo; notas o recortes cortos.
-7. **Hipótesis, coartadas, contradicciones y secretos**: son las conexiones (hilos) y los sellos.
+7. **Hipótesis, coartadas, contradicciones y secretos**.
+Las conexiones entre todo esto serán los hilos.
 
 ## 2. Cómo elegir la representación de cada cosa
-- **Persona o lugar con ficha propia** → `entity` (se muestra como foto con marco y su nombre). Usa el **nombre exacto** de la aventura: el módulo lo usa para vincularlo con el actor o la escena del mundo si ya existen; si no existen, la pieza queda «sin vincular» y el master la vincula después.
-- **Pista breve** → `note` (nota adhesiva: una frase). Pista con más contexto → `clipping`.
+- **Persona o lugar con ficha propia** → `entity` (foto con marco y su nombre). Usa el **nombre exacto** de la aventura: el módulo lo usa para vincularlo con el actor o la escena del mundo si ya existen; si no existen, la pieza queda «sin vincular» y el master la vincula después.
+- **Pista breve** → `note` (una frase). Pista con más contexto → `clipping`.
 - **Noticia, telegrama, ficha policial, carta corta** → `clipping` con el `paper` que mejor encaje (periódico para prensa, telegrama para telegramas, ficha para informes, libreta para anotaciones, papel viejo para cartas).
 - **Documento largo o que el master quiera dar a leer a los jugadores** → `journal` (título y texto completos; se crea como diario y los jugadores solo lo leen cuando el master les da permiso).
-- **Lugar o escena visual sin ficha** → `photo` (pie de foto = nombre del lugar; la imagen se elige después, deja `src` vacío).
+- **Lugar o escena visual sin ficha** → `photo` (pie de foto = nombre del lugar; deja `src` vacío, la imagen se elige después).
 - **Estado o calificación** (URGENTE, CONFIDENCIAL, RESUELTO, SOSPECHOSO…) → `stamp` junto a la pieza que califica.
 - **Énfasis** (rodear, tachar, subrayar, flecha, huella) → `mark`. Úsalas con medida.
-- Variedad: alterna papeles, marcos y sellos para que no parezca una plantilla, pero conserva una lógica (p. ej. sospechosos con `polaroid`, víctimas con `foto-sepia-esquinas`, pruebas con `diapositiva`).
+- Variedad: alterna papeles, marcos y sellos para que no parezca una plantilla, pero con lógica (p. ej. sospechosos con `polaroid`, víctimas con `foto-sepia-esquinas`, pruebas con `diapositiva`).
 
-## 3. Qué se ve desde el principio y qué se oculta
-`hidden: true` oculta la pieza a los jugadores hasta que el master la revele (con un clic). Usa:
-- **Visible (`hidden: false`)**: lo que los jugadores saben al empezar (el caso, la víctima, los sospechosos obvios, la escena inicial).
-- **Oculto (`hidden: true`)**: pistas aún no descubiertas, secretos, la identidad real del culpable, conexiones que se revelan más adelante. **Ante la duda, oculta.**
-- Un hilo solo se ve si sus dos extremos son visibles.
-- `showToAll: true` en una `entity` hace que se muestre su nombre e imagen a todos aunque los jugadores no tengan permiso sobre la ficha del actor.
+## 3. Capas de revelación (para no abrumar a los jugadores)
+En vez de mostrarlo todo de golpe, divide la información en **entre 3 y 6 capas** que el master irá revelando según avance la partida (por actos, capítulos o niveles de conocimiento). Defínelas en `layers` y asigna cada pieza a una con `layer`:
+- Capa 1: lo que los jugadores saben al empezar → `"revealed": true`. Las demás → `"revealed": false`.
+- Ordena las capas de menor a mayor profundidad (planteamiento → desarrollo → giros → verdad final). Pon nombres cortos y claros («Planteamiento», «Los sospechosos», «El giro»).
+- Cada pieza va en **una** capa. Una pieza que no pongas en ninguna capa será visible desde el principio.
+- `hidden: true` es para un secreto concreto dentro de una capa ya revelada (se muestra con un clic del master). Normalmente **no lo uses** si ya usas capas.
+- `showToAll: true` en una `entity` muestra su nombre e imagen a todos aunque los jugadores no tengan permiso sobre la ficha del actor.
 
-## 4. Hilos (conexiones)
+## 4. Caminos
+Cuando el master «activa» un personaje, la pizarra le propone seguir **su camino**: las piezas unidas a ese personaje por hilos, de cercana a lejana, para revelarlas una a una. Por eso **conecta cada personaje con las pistas, documentos y lugares que llevan a él o salen de él, en el orden en que se descubrirían**. Una cadena clara (persona → pista → documento → otra persona) es mejor que muchos hilos cruzados.
+
+## 5. Hilos (conexiones)
 Une piezas con `links`. Elige el color y el estilo con este significado y mantenlo en toda la pizarra:
 - Color: `rojo` = relación directa o hecho comprobado · `azul` = pista o hipótesis débil · `verde` = coartada o inocencia · `ambar` = sospecha o duda · `violeta` = vínculo oculto o secreto · `negro` = parentesco o pasado común.
 - Estilo: `solido` = confirmado · `punteado` = hipótesis · `discontinuo` = contradicción o dato dudoso.
 - `label`: etiqueta corta (máx. 40 caracteres) que diga qué une las piezas («coartada falsa», «vio el barco»).
-No conectes todo con todo: solo las relaciones que ayuden a investigar.
+No conectes todo con todo: solo las relaciones que ayuden a investigar. Un hilo solo se ve si sus dos piezas son visibles.
 
-## 5. Composición (posiciones)
+## 6. Composición (posiciones)
 El lienzo mide **3200 × 2000** (origen arriba a la izquierda; x → derecha, y → abajo). `x`,`y` son la esquina superior izquierda de la pieza.
 - Deja un margen de 150 px con el borde y al menos 60 px entre piezas.
-- **Agrupa por tema**: el caso o la víctima en el centro (≈ x 1400–1800, y 800–1100); los sospechosos en un arco a su alrededor; cada pista cerca de la persona o lugar al que apunta; los documentos y recortes en una zona propia; la cronología en una fila (p. ej. arriba, y entre 150 y 450) de izquierda a derecha en orden temporal.
-- Tamaños por defecto (`w`, ancho en px; el alto sale solo): nota 190 · recorte 280–360 · foto/ficha 210–240 · sello 230 · marca 170. Alto aproximado: nota = w · recorte = w×1,25 · foto/ficha = w×1,2 · sello rectangular = w×0,36.
+- **Agrupa por tema**: el caso o la víctima en el centro (≈ x 1400–1800, y 800–1100); los sospechosos en un arco a su alrededor; cada pista cerca de la persona o lugar al que apunta; los documentos y recortes en una zona propia; la cronología en una fila de izquierda a derecha en orden temporal.
+- Tamaños (`w`, ancho en px; el alto sale solo): nota 190 · recorte 280–360 · foto/ficha 210–240 · sello 230 · marca 170. Alto aproximado: nota = w · recorte = w×1,25 · foto/ficha = w×1,2 · sello rectangular = w×0,36.
 - `rot` (giro) entre −6 y 6 grados, distinto en cada pieza, para que parezca colgado a mano.
 - Calcula las posiciones para que **no se solapen** piezas del mismo grupo. Si tienes muchas piezas, usa todo el lienzo.
 
-## 6. Formato de salida (muy importante)
+## 7. Formato de salida (muy importante)
 Responde con **un único bloque de código ```json```** que contenga un objeto JSON válido (sin comentarios, sin comas finales) y **nada más después**. Estructura:
 
 ```json
 {
   "format": "mr-pizarra-import",
   "version": 1,
+  "mode": "board",
   "title": "Nombre del caso",
   "background": "corcho-claro",
   "pinPreset": { "pin": "auto", "color": "", "layout": "auto" },
+  "layers": [ /* capas */ ],
   "items": [ /* piezas */ ],
   "links": [ /* hilos */ ]
 }
 ```
 
+### Capas (`layers`)
+`{ "ref": "acto1", "name": "Planteamiento", "revealed": true }`. `ref` único y corto; `revealed` indica si está visible para los jugadores al empezar. Máximo 12.
+
 ### Piezas (`items`)
-Cada pieza lleva `ref` (identificador único y corto que inventas: `"npc-voss"`, `"pista-llave"`), `type`, `x`, `y`, `w` (opcional), `rot` (opcional), `hidden` y los campos de su tipo. Máximo 250 piezas y 500 hilos. Nunca uses un id que no esté en las listas de abajo.
+Cada pieza lleva `ref` (identificador único y corto que inventas: `"npc-voss"`, `"pista-llave"`), `type`, `layer` (el `ref` de su capa), `x`, `y`, `w` (opcional), `rot` (opcional) y los campos de su tipo. Máximo 250 piezas y 500 hilos. Nunca uses un id que no esté en las listas de abajo.
 
 | type | campos propios |
 |---|---|
@@ -191,19 +201,24 @@ Campos opcionales de sujeción en `note`, `clipping`, `photo`, `entity` y `journ
 
 Colores de hilo: "rojo", "azul", "verde", "ambar", "violeta", "negro". Estilos de hilo: "solido", "punteado", "discontinuo".
 
-## 7. Ejemplo mínimo (solo para ilustrar la forma; no copies su contenido)
+## 8. Ejemplo mínimo (solo para ilustrar la forma; no copies su contenido)
 ```json
 {
   "format": "mr-pizarra-import",
   "version": 1,
+  "mode": "board",
   "title": "El caso del faro",
   "background": "corcho-noir",
+  "layers": [
+    { "ref": "inicio", "name": "Planteamiento", "revealed": true },
+    { "ref": "giro", "name": "El giro", "revealed": false }
+  ],
   "items": [
-    { "ref": "caso", "type": "clipping", "x": 1350, "y": 780, "w": 340, "paper": "periodico-2", "title": "Hallan muerto al farero", "text": "El cuerpo de Alfred Hargreaves fue encontrado en la sala de la linterna…", "rot": -2, "hidden": false },
-    { "ref": "viuda", "type": "entity", "kind": "Actor", "name": "Eleanor Hargreaves", "x": 900, "y": 560, "frame": "polaroid", "rot": 3, "hidden": false },
-    { "ref": "carta", "type": "journal", "title": "Carta anónima", "text": "Sé lo que hicisteis en el muelle…", "x": 1900, "y": 560, "hidden": true },
-    { "ref": "llave", "type": "note", "x": 1250, "y": 1180, "color": "amarillo", "text": "La segunda llave nunca apareció", "rot": 4, "hidden": true },
-    { "ref": "sello", "type": "stamp", "x": 1420, "y": 640, "kind": "marco-rect-rojo", "text": "SIN RESOLVER", "rot": -5, "hidden": false }
+    { "ref": "caso", "type": "clipping", "layer": "inicio", "x": 1350, "y": 780, "w": 340, "paper": "periodico-2", "title": "Hallan muerto al farero", "text": "El cuerpo de Alfred Hargreaves fue encontrado en la sala de la linterna…", "rot": -2 },
+    { "ref": "viuda", "type": "entity", "layer": "inicio", "kind": "Actor", "name": "Eleanor Hargreaves", "x": 900, "y": 560, "frame": "polaroid", "rot": 3 },
+    { "ref": "carta", "type": "journal", "layer": "giro", "title": "Carta anónima", "text": "Sé lo que hicisteis en el muelle…", "x": 1900, "y": 560 },
+    { "ref": "llave", "type": "note", "layer": "giro", "x": 1250, "y": 1180, "color": "amarillo", "text": "La segunda llave nunca apareció", "rot": 4 },
+    { "ref": "sello", "type": "stamp", "layer": "inicio", "x": 1420, "y": 640, "kind": "marco-rect-rojo", "text": "SIN RESOLVER", "rot": -5 }
   ],
   "links": [
     { "from": "viuda", "to": "caso", "color": "rojo", "style": "solido", "label": "esposa de la víctima" },
@@ -212,12 +227,12 @@ Colores de hilo: "rojo", "azul", "verde", "ambar", "violeta", "negro". Estilos d
 }
 ```
 
-## 8. Antes de responder, comprueba
+## Antes de responder, comprueba
 - El JSON es válido y es lo único que hay en tu respuesta (más, si quieres, una frase antes).
-- Todos los `ref` son únicos y todos los `from`/`to` existen.
+- Todos los `ref` son únicos y todos los `layer` existen en `layers`.
 - Todos los ids (papel, marco, sello, marca, sujeción, colocación, fondo, color, estilo) están en las listas.
-- Las piezas no se solapan y están dentro de 3200 × 2000.
-- Lo que los jugadores no deben saber al empezar tiene `hidden: true`.
 - No has inventado hechos que no estén en la aventura.
+- Las piezas no se solapan y están dentro de 3200 × 2000.
+- Cada personaje tiene un camino de hilos que lleva a sus pistas.
 
 Ahora te paso la aventura:

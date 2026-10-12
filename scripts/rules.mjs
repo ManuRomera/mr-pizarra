@@ -7,7 +7,7 @@
  * mueven piezas distintas escriben en rutas distintas y nunca se pisan.
  */
 export const ID = "mr-pizarra";
-export const BOARD = Object.freeze({ maxItems: 250, maxLinks: 500, width: 3200, height: 2000, titleMax: 120, textMax: 4000, labelMax: 60, batch: 60 });
+export const BOARD = Object.freeze({ maxLayers: 12, maxItems: 250, maxLinks: 500, width: 3200, height: 2000, titleMax: 120, textMax: 4000, labelMax: 60, batch: 60 });
 export const FLAG = `flags.${ID}.board`;
 export const ASSETS = `modules/${ID}/assets`;
 export const asset = (folder, name) => `${ASSETS}/${folder}/${name}.webp`;
@@ -127,6 +127,53 @@ export const MARKS = Object.freeze([
     ["humedad-1", "Humedad", { group: "Manchas", multiply: true }],
   ]),
 ]);
+/** Colores de las capas de revelación. */
+export const LAYER_COLORS = Object.freeze(["#c0392b", "#2c6fbb", "#2f8f5b", "#d9a21b", "#7d4fb5", "#e8742a", "#16a0a0", "#c2548e"]);
+
+/**
+ * ¿Ve esta persona la pieza? La Guardiana lo ve todo. El resto no ve una pieza oculta, una privada ajena ni una pieza de una
+ * capa sin revelar (salvo que la Guardiana la haya mostrado a propósito con `shown`, p. ej. al seguir un camino).
+ */
+export function isVisibleTo(item, board, { isGM, userId }) {
+  if (isGM) return true;
+  if (item.hidden) return false;
+  if (item.owner && item.owner !== userId) return false;
+  const layer = item.layer ? board?.layers?.[item.layer] : null;
+  return !(layer && !layer.revealed && !item.shown);
+}
+
+/**
+ * Camino de una pieza: las piezas unidas a ella por hilos, por orden de cercanía (nivel 1 = unidas directamente,
+ * nivel 2 = unidas a esas…). Dentro de un nivel, de izquierda a derecha. Cada entrada lleva el hilo por el que se llega.
+ * @returns {{id:string, dist:number, link:{id:string, label:string, color:string, style:string}}[]}
+ */
+export function pathFrom(board, startId) {
+  const items = board?.items ?? {};
+  if (!items[startId]) return [];
+  const adj = new Map();
+  for (const [linkId, l] of Object.entries(board.links ?? {})) {
+    if (!items[l.from] || !items[l.to]) continue;
+    for (const [a, b] of [[l.from, l.to], [l.to, l.from]]) adj.set(a, [...(adj.get(a) ?? []), { to: b, link: { id: linkId, label: l.label ?? "", color: l.color, style: l.style } }]);
+  }
+  const seen = new Map([[startId, 0]]);
+  const out = [];
+  let tier = [startId];
+  for (let dist = 1; tier.length; dist++) {
+    const next = [];
+    for (const from of tier) {
+      for (const { to, link } of adj.get(from) ?? []) {
+        if (seen.has(to)) continue;
+        seen.set(to, dist);
+        next.push({ id: to, dist, link });
+      }
+    }
+    next.sort((a, b) => items[a.id].x - items[b.id].x || items[a.id].y - items[b.id].y);
+    out.push(...next);
+    tier = next.map((n) => n.id);
+  }
+  return out;
+}
+
 export const THREAD_COLORS = Object.freeze({ rojo: "#c0392b", azul: "#2c6fbb", verde: "#2f8f5b", ambar: "#d9a21b", violeta: "#7d4fb5", negro: "#2b2b2b" });
 export const THREAD_STYLES = Object.freeze(["solido", "punteado", "discontinuo"]);
 export const ITEM_TYPES = Object.freeze(["note", "clipping", "photo", "journal", "entity", "stamp", "mark"]);
@@ -275,7 +322,7 @@ const COMMON = {
   w: (v) => clamp(v, 60, 1100),
 };
 
-function cleanItem(data, existing, ctx) {
+function cleanItem(data, existing, ctx, work) {
   const out = {};
   for (const key of Object.keys(data)) {
     if (key === "type") continue;
@@ -288,6 +335,25 @@ function cleanItem(data, existing, ctx) {
       continue;
     }
     if (key === "reveal" && !ctx.isGM) throw Error("Solo la Guardiana puede mostrar una ficha sin permiso.");
+    if (key === "layer") {
+      if (!ctx.isGM) throw Error("Solo la Guardiana puede asignar capas.");
+      if (data.layer !== "" && !work.layers[data.layer]) throw Error("Esa capa no existe.");
+      out.layer = data.layer;
+      continue;
+    }
+    if (key === "shown") {
+      if (!ctx.isGM) throw Error("Solo la Guardiana puede mostrar piezas de una capa oculta.");
+      out.shown = Boolean(data.shown);
+      continue;
+    }
+    if (key === "box") {
+      out.box = Boolean(data.box);
+      continue;
+    }
+    if (key === "group") {
+      out.group = clean(data.group, 30);
+      continue;
+    }
     if (key === "hidden") {
       if (!ctx.isGM) throw Error("Solo la Guardiana puede ocultar piezas.");
       out.hidden = Boolean(data.hidden);
@@ -301,7 +367,7 @@ function cleanItem(data, existing, ctx) {
   return out;
 }
 
-const forbidden = (item, ctx) => (item.hidden && !ctx.isGM) || (item.owner && !ctx.isGM && item.owner !== ctx.userId);
+const forbidden = (item, ctx, work) => !ctx.isGM && !isVisibleTo(item, work, ctx);
 
 /**
  * @param {{items?:object, links?:object, background?:string}} board  estado actual
@@ -310,7 +376,7 @@ const forbidden = (item, ctx) => (item.hidden && !ctx.isGM) || (item.owner && !c
  * @returns {{ops:object[], update:object, board:object}}  operaciones limpias, `update` equivalente y estado resultante
  */
 export function planOps(board, ops, ctx) {
-  const work = { background: board?.background, locked: Boolean(board?.locked), items: structuredClone(board?.items ?? {}), links: structuredClone(board?.links ?? {}) };
+  const work = { background: board?.background, locked: Boolean(board?.locked), layers: structuredClone(board?.layers ?? {}), items: structuredClone(board?.items ?? {}), links: structuredClone(board?.links ?? {}) };
   const out = [];
   const update = {};
   const dropLink = (id) => {
@@ -326,8 +392,8 @@ export function planOps(board, ops, ctx) {
       const data = raw.data ?? {};
       const existing = work.items[id];
       if (existing) {
-        if (forbidden(existing, ctx)) throw Error("No puedes tocar esa pieza.");
-        const fields = cleanItem(data, existing, ctx);
+        if (forbidden(existing, ctx, work)) throw Error("No puedes tocar esa pieza.");
+        const fields = cleanItem(data, existing, ctx, work);
         Object.assign(existing, fields);
         for (const [key, value] of Object.entries(fields)) update[`${FLAG}.items.${id}.${key}`] = value;
         out.push({ op: "set", kind: "items", id, data: fields });
@@ -355,14 +421,14 @@ export function planOps(board, ops, ctx) {
       if (data.type === "mark") Object.assign(item, { kind: "tachado-1" });
       if (data.type === "entity") item.frame = "polaroid";
       if (!ctx.isGM && "hidden" in data) throw Error("Solo la Guardiana puede ocultar piezas.");
-      Object.assign(item, cleanItem(data, item, ctx));
+      Object.assign(item, cleanItem(data, item, ctx, work));
       work.items[id] = item;
       for (const [key, value] of Object.entries(item)) update[`${FLAG}.items.${id}.${key}`] = value;
       out.push({ op: "set", kind: "items", id, data: { ...item } });
     } else if (raw.kind === "items" && raw.op === "remove") {
       const existing = work.items[id];
       if (!existing) continue;
-      if (forbidden(existing, ctx)) throw Error("No puedes quitar esa pieza.");
+      if (forbidden(existing, ctx, work)) throw Error("No puedes quitar esa pieza.");
       delete work.items[id];
       update[`${FLAG}.items.-=${id}`] = null;
       out.push({ op: "remove", kind: "items", id });
@@ -382,7 +448,7 @@ export function planOps(board, ops, ctx) {
       }
       const { from, to } = data;
       if (!work.items[from] || !work.items[to] || from === to) throw Error("Un hilo une dos piezas distintas de la pizarra.");
-      if (forbidden(work.items[from], ctx) || forbidden(work.items[to], ctx)) throw Error("No puedes unir esa pieza.");
+      if (forbidden(work.items[from], ctx, work) || forbidden(work.items[to], ctx, work)) throw Error("No puedes unir esa pieza.");
       if (Object.keys(work.links).length >= BOARD.maxLinks) throw Error("Hay demasiados hilos.");
       const link = { from, to, color: "rojo", style: "solido", label: "", ...fields };
       const twin = Object.values(work.links).some((l) => l.color === link.color && l.style === link.style && [l.from, l.to].sort().join() === [from, to].sort().join());
@@ -392,8 +458,42 @@ export function planOps(board, ops, ctx) {
       out.push({ op: "set", kind: "links", id, data: link });
     } else if (raw.kind === "links" && raw.op === "remove") {
       const link = work.links[id];
-      if (link && (forbidden(work.items[link.from] ?? {}, ctx) || forbidden(work.items[link.to] ?? {}, ctx))) throw Error("No puedes quitar ese hilo.");
+      if (link && (forbidden(work.items[link.from] ?? {}, ctx, work) || forbidden(work.items[link.to] ?? {}, ctx, work))) throw Error("No puedes quitar ese hilo.");
       if (link) dropLink(id);
+    } else if (raw.kind === "layers") {
+      if (!ctx.isGM) throw Error("Solo la Guardiana gestiona las capas.");
+      const existing = work.layers[id];
+      if (raw.op === "remove") {
+        if (!existing) continue;
+        delete work.layers[id];
+        update[`${FLAG}.layers.-=${id}`] = null;
+        out.push({ op: "remove", kind: "layers", id });
+        for (const [itemId, item] of Object.entries(work.items)) {
+          if (item.layer !== id) continue;
+          item.layer = "";
+          update[`${FLAG}.items.${itemId}.layer`] = "";
+        }
+        continue;
+      }
+      if (raw.op !== "set") throw Error("Operación de pizarra desconocida.");
+      const data = raw.data ?? {};
+      const fields = {};
+      if ("name" in data) fields.name = clean(data.name, 40).trim() || "Capa";
+      if ("color" in data) fields.color = /^#[0-9a-fA-F]{6}$/.test(String(data.color)) ? data.color : (() => { throw Error("Color de capa no válido."); })();
+      if ("revealed" in data) fields.revealed = Boolean(data.revealed);
+      if ("order" in data) fields.order = clamp(data.order, 0, 999);
+      if (existing) Object.assign(existing, fields);
+      else {
+        if (Object.keys(work.layers).length >= BOARD.maxLayers) throw Error("Hay demasiadas capas.");
+        const n = Object.keys(work.layers).length;
+        const layer = { name: `Capa ${n + 1}`, color: LAYER_COLORS[n % LAYER_COLORS.length], revealed: false, order: n, ...fields };
+        work.layers[id] = layer;
+        for (const [key, value] of Object.entries(layer)) update[`${FLAG}.layers.${id}.${key}`] = value;
+        out.push({ op: "set", kind: "layers", id, data: { ...layer } });
+        continue;
+      }
+      for (const [key, value] of Object.entries(fields)) update[`${FLAG}.layers.${id}.${key}`] = value;
+      out.push({ op: "set", kind: "layers", id, data: fields });
     } else if (raw.kind === "settings" && raw.op === "set") {
       const data = {};
       if ("background" in (raw.data ?? {})) data.background = oneOf(raw.data.background, TABLES.background, "Fondo");

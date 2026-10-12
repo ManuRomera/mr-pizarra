@@ -8,9 +8,11 @@
  *  - Mientras alguien arrastra una pieza, los demás la ven moverse en directo y no pueden cogerla (mensaje efímero).
  *  - Los documentos colgados respetan los permisos de cada persona (ver refs.mjs).
  */
-import { ID, FLAG, BOARD, BACKGROUNDS, PAPERS, MASKS, PINS, STAMPS, MARKS, FRAMES, NOTE_COLORS, THREAD_COLORS, THREAD_STYLES, TABLES, PIN_LAYOUTS, DEFAULT_PIN_PRESET, planOps, look, asset } from "./rules.mjs";
+import { ID, FLAG, BOARD, isVisibleTo, pathFrom, BACKGROUNDS, PAPERS, MASKS, PINS, STAMPS, MARKS, FRAMES, NOTE_COLORS, THREAD_COLORS, THREAD_STYLES, TABLES, PIN_LAYOUTS, DEFAULT_PIN_PRESET, planOps, look, asset } from "./rules.mjs";
 import { t, esc, uid, MANIFEST } from "./util.mjs";
-import { renderItem, visibleTo, widthOf, pinElementHTML } from "./items.mjs";
+import { renderItem, visibleTo, widthOf, pinElementHTML, boxCardHTML } from "./items.mjs";
+
+const TYPE_ICON = { note: "fa-note-sticky", clipping: "fa-newspaper", photo: "fa-image", journal: "fa-file-lines", entity: "fa-user", stamp: "fa-stamp", mark: "fa-pen-nib" };
 
 const BLOCKED_PAPERS = new Set(["sobre", "fotocopia"]);
 const PIN_COLORS = ["#c0392b", "#2c6fbb", "#2f8f5b", "#e0b020", "#2b2b2b", "#f4f1e8", "#7d4fb5", "#e8742a"];
@@ -237,7 +239,7 @@ const TOOLS = [
   { group: "mode", items: [["select", "fa-solid fa-arrow-pointer", "toolSelect", "V"], ["hand", "fa-regular fa-hand", "toolHand", "H / Espacio"]] },
   { group: "add", items: [["note", "fa-solid fa-note-sticky", "note"], ["clipping", "fa-regular fa-newspaper", "clipping"], ["photo", "fa-regular fa-image", "photo"], ["doc", "fa-regular fa-file-lines", "journal"], ["stamp", "fa-solid fa-stamp", "stamp"], ["mark", "fa-solid fa-pen-nib", "mark"]] },
   { group: "link", items: [["thread", "fa-solid fa-bezier-curve", "thread", "T"]] },
-  { group: "board", items: [["bg", "fa-solid fa-palette", "background"]] },
+  { group: "board", items: [["bg", "fa-solid fa-palette", "background"], ["box", "fa-solid fa-box-open", "box"]] },
 ];
 
 export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
@@ -265,6 +267,9 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
   #preview = new Map();
   #raf = 0;
   #flyoutKey = null;
+  #flyPos = null;
+  #flyTab = "layers";
+  #pathId = null;
 
   constructor(options = {}) {
     const saved = stored(`win.${options.document?.id}`, {});
@@ -349,6 +354,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
         <header class="mrp-topbar">
           <div class="mrp-title"><span class="mrp-badge-logo"><i class="fa-solid fa-thumbtack"></i></span><div><strong class="mrp-name"></strong><small class="mrp-meta"></small></div></div>
           <div class="mrp-chips">
+            ${game.user.isGM ? `<button type="button" class="mrp-chip" data-act="layers" aria-haspopup="dialog" data-tooltip="${esc(t("layersTitle"))}"><i class="fa-solid fa-layer-group"></i><span class="mrp-layerlabel"></span></button>` : ""}
             ${game.user.isGM ? `<button type="button" class="mrp-chip mrp-chip-warn" data-act="pending" aria-haspopup="dialog" hidden><i class="fa-solid fa-link-slash"></i><span class="mrp-pendingcount"></span></button>
             <button type="button" class="mrp-chip" data-act="import" data-tooltip="${esc(t("importTip"))}"><i class="fa-solid fa-file-import"></i><span>${esc(t("importShort"))}</span></button>` : ""}
             <button type="button" class="mrp-chip" data-act="pins" aria-haspopup="dialog" data-tooltip="${esc(t("pinPreset"))}"><i class="fa-solid fa-thumbtack"></i><span class="mrp-pinlabel"></span></button>
@@ -439,6 +445,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     else if (act === "zoom100") this.#zoomAt(1 / this.#view.k, cx, cy);
     else if (act === "bg") this.#tool("bg");
     else if (act === "import") game.modules.get(ID).api.importBoard(this.document);
+    else if (act === "layers") this.#toggleFlyout("layers", () => this.#layersFlyout(event.target.closest("button")));
     else if (act === "pending") this.#toggleFlyout("pending", () => this.#pendingFlyout(event.target.closest("button")));
     else if (act === "pins") this.#toggleFlyout("pin-board", () => this.#pinFlyout(event.target.closest("button"), "board"));
     else if (act === "a11y") this.#toggleFlyout("a11y", () => this.#a11yFlyout(event.target.closest("button")));
@@ -523,6 +530,12 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     this.#root.querySelector(".mrp-name").textContent = this.document.name;
     this.#root.querySelector(".mrp-bgname").textContent = bg.name;
     this.#root.querySelector(".mrp-pinlabel").textContent = this.#pinLabel();
+    const layers = this.#layerList();
+    const layerChip = this.#root.querySelector(".mrp-layerlabel");
+    if (layerChip) layerChip.textContent = layers.length ? `${layers.filter((l) => l.revealed).length}/${layers.length} ${t("layersWord")}` : t("layersWord");
+    const boxCount = this.#boxEntries().length;
+    const boxButton = this.#root.querySelector('[data-tool="box"]');
+    if (boxButton) boxButton.dataset.count = boxCount ? String(boxCount) : "";
     const pending = this.#pending();
     const chip = this.#root.querySelector("[data-act=pending]");
     if (chip) {
@@ -532,7 +545,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     const container = this.#root.querySelector(".mrp-items");
     const seen = new Set();
     for (const [id, item] of Object.entries(board.items ?? {})) {
-      if (!visibleTo(item)) continue;
+      if (item.box || !visibleTo(item, board)) continue; // lo que está en la caja no se pinta en el lienzo
       seen.add(id);
       const { html, sig } = renderItem(id, item, board);
       const old = container.querySelector(`[data-id="${id}"]`);
@@ -553,6 +566,9 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     this.#root.querySelector(".mrp-meta").textContent = `${seen.size} ${t(seen.size === 1 ? "pieceOne" : "pieceMany")} · ${links} ${t(links === 1 ? "threadOne" : "threadMany")}`;
     this.#first = false;
     this.#hud();
+    this.#renderLayersBody();
+    this.#renderBox();
+    this.#applyGlow();
     this.#buildPins();
     this.#drawThreads();
     this.#drawSel();
@@ -692,6 +708,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
       ${b("rot-", "fa-solid fa-rotate-left", "rotateLeft")}${b("rot+", "fa-solid fa-rotate-right", "rotateRight")}${sep}
       ${b("scale-", "fa-solid fa-down-left-and-up-right-to-center", "scaleDown")}${b("scale+", "fa-solid fa-up-right-and-down-left-from-center", "scaleUp")}${sep}
       ${n > 1 ? `${b("align", "fa-solid fa-align-left", "align")}${sep}` : ""}
+      ${game.user.isGM ? b("layer", "fa-solid fa-layer-group", "layerAssign") : ""}${b("box", "fa-solid fa-box-archive", "boxStore")}
       ${b("pins", "fa-solid fa-thumbtack", "decoration")}${n === 1 ? b("details", "fa-solid fa-sliders", "editDetails") : ""}
       ${b("dup", "fa-regular fa-clone", "duplicate")}${b("front", "fa-solid fa-arrow-up-long", "front")}${b("back", "fa-solid fa-arrow-down-long", "back")}
       ${game.user.isGM ? b("hide", "fa-solid fa-eye-slash", "hideToggle") : ""}${sep}${b("del", "fa-solid fa-trash", "remove", 'class="danger"')}`;
@@ -705,6 +722,8 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     if (act === "align") return this.#alignMenu(event);
     if (act === "pins") return this.#toggleFlyout("pin-selection", () => this.#pinFlyout(event.target.closest("button"), "selection"));
     if (act === "details") return this.#edit([...this.#sel][0]);
+    if (act === "layer") return this.#layerMenu(event);
+    if (act === "box") return this.#putInBox();
     if (act === "dup") return this.#duplicate();
     if (act === "front") return this.#reorder(true);
     if (act === "back") return this.#reorder(false);
@@ -1028,6 +1047,16 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
         const old = b.links?.[op.id];
         if (op.op === "set") groups.push([old ? { op: "set", kind: "links", id: op.id, data: keep(old, op.data, op.id, "links") } : { op: "remove", kind: "links", id: op.id }]);
         else if (old) groups.push([{ op: "set", kind: "links", id: op.id, data: { ...old } }]);
+      } else if (op.kind === "layers") {
+        const old = b.layers?.[op.id];
+        if (op.op === "set") {
+          const data = {};
+          if (old) for (const k of Object.keys(op.data)) if (k in old) data[k] = old[k];
+          groups.push([old ? { op: "set", kind: "layers", id: op.id, data } : { op: "remove", kind: "layers", id: op.id }]);
+        } else if (old) {
+          const members = Object.entries(b.items ?? {}).filter(([, i]) => i.layer === op.id).map(([id]) => ({ op: "set", kind: "items", id, data: { layer: op.id } }));
+          groups.push([{ op: "set", kind: "layers", id: op.id, data: { ...old } }, ...members]);
+        }
       } else if (op.kind === "settings") {
         const data = {};
         for (const k of Object.keys(op.data)) if (k in b) data[k] = b[k];
@@ -1036,7 +1065,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     }
     // primero las piezas y después los hilos: un hilo entre dos piezas borradas necesita a las dos ya devueltas
     const flat = groups.reverse().flat();
-    return [...flat.filter((op) => op.kind !== "links"), ...flat.filter((op) => op.kind === "links")];
+    return [...flat.filter((op) => op.kind === "layers"), ...flat.filter((op) => op.kind !== "links" && op.kind !== "layers"), ...flat.filter((op) => op.kind === "links")];
   }
 
   async #commit(ops, { record = true } = {}) {
@@ -1174,6 +1203,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
       return this.#hud();
     }
     if (name === "lock") return this.#commit([{ op: "set", kind: "settings", id: uid(), data: { locked: !this.board.locked } }]);
+    if (name === "box") return this.#toggleFlyout("box", () => this.#boxFlyout(this.#root.querySelector('[data-tool="box"]')));
     if (!this.canEdit) return ui.notifications.warn(t("locked"));
     if (name === "bg") return this.#pickBackground();
     const button = this.#root.querySelector(`[data-tool="${name}"]`);
@@ -1342,6 +1372,8 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
   #drop(event) {
     event.preventDefault();
     if (!this.canEdit) return;
+    const dragged = event.dataTransfer?.getData("text/plain") ?? "";
+    if (dragged.startsWith("mrp-box:")) return this.#takeOut(dragged.slice(8), this.#toWorld(event.clientX, event.clientY));
     const data = foundry.applications.ux.TextEditor.implementation.getDragEventData(event);
     const uuid = data?.uuid;
     if (!uuid) return ui.notifications.warn(t("dropUnsupported"));
@@ -1431,6 +1463,9 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
       !multi && edit && { icon: "fa-solid fa-bezier-curve", label: t("threadFrom"), fn: () => ((this.#threadMode = true), (this.#threadFrom = id), this.#select([]), this.#el(id)?.classList.add("mrp-threadsrc"), this.#hud()) },
       edit && { separator: true },
       edit && { icon: "fa-regular fa-clone", label: t(multi ? "duplicateSel" : "duplicate"), fn: () => this.#duplicate() },
+      game.user.isGM && { icon: "fa-solid fa-layer-group", label: t("layerAssign"), fn: () => this.#layerMenu(event) },
+      game.user.isGM && !multi && Object.values(this.board.links ?? {}).some((l) => l.from === id || l.to === id) && { icon: "fa-solid fa-route", label: t("pathOf"), fn: () => this.#layersFlyout(this.#root.querySelector("[data-act=layers]"), "paths", id) },
+      edit && { icon: "fa-solid fa-box-archive", label: t("boxStore"), fn: () => this.#putInBox() },
       edit && { icon: "fa-solid fa-arrow-up-long", label: t("front"), fn: () => this.#reorder(true) },
       edit && { icon: "fa-solid fa-arrow-down-long", label: t("back"), fn: () => this.#reorder(false) },
       game.user.isGM && { icon: allHidden ? "fa-solid fa-eye" : "fa-solid fa-eye-slash", label: t(allHidden ? "reveal" : "hide"), fn: () => this.#toggleHidden() },
@@ -1545,6 +1580,11 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     box.style.top = `${y / z}px`;
   }
 
+  /** Coloca (o recoloca, si el contenido cambió de alto) el panel desplegable dentro de la ventana. */
+  #placeFlyout(box = this.#root?.querySelector(".mrp-flyout")) {
+    if (box && this.#flyPos) this.#place(box, this.#flyPos.left, this.#flyPos.top);
+  }
+
   /** Panel flotante junto a un botón: al lado del dock (`right`) o bajo la barra superior (`below`). */
   #flyout(anchor, title, html, { side = "right", key = title, mount } = {}) {
     this.#closeFlyout();
@@ -1557,12 +1597,13 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     box.setAttribute("aria-label", title);
     box.innerHTML = `<header><strong>${esc(title)}</strong><button type="button" data-fly="close" aria-label="${esc(t("close"))}"><i class="fa-solid fa-xmark"></i></button></header><div class="mrp-fly-body">${html}</div>`;
     this.#root.append(box);
-    this.#place(box, side === "right" ? a.right - root.left + 10 : a.left - root.left, side === "right" ? a.top - root.top - 6 : a.bottom - root.top + 8);
+    this.#flyPos = { left: side === "right" ? a.right - root.left + 10 : a.left - root.left, top: side === "right" ? a.top - root.top - 6 : a.bottom - root.top + 8 };
     box.addEventListener("click", (event) => {
       if (event.target.closest('[data-fly="close"]')) this.#closeFlyout();
     });
+    this.#flyoutKey = key; // antes de montar: el repintado de capas y caja la comprueba
     mount?.(box);
-    this.#flyoutKey = key;
+    this.#placeFlyout(box);
     box.querySelector("input, button.mrp-var, button:not([data-fly])")?.focus({ preventScroll: true });
     return box;
   }
@@ -1787,6 +1828,277 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     if (item.type === "photo" && !name) return this.#chooseImage(id);
     if (item.type === "mark") return this.#edit(id);
     this.#startEdit(id, name ?? "text");
+  }
+
+  /* ---------- capas de revelación ---------- */
+
+  #layerList() {
+    return Object.entries(this.board.layers ?? {}).map(([id, l]) => ({ id, ...l })).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+  }
+
+  /** ¿Lo ven ya los jugadores? (para la Guardiana, que lo ve todo siempre) */
+  #seenByPlayers(item) {
+    return isVisibleTo(item, this.board, { isGM: false, userId: "" });
+  }
+
+  #layersFlyout(anchor, tab = "layers", pathId = null) {
+    this.#flyTab = tab;
+    this.#pathId = pathId;
+    this.#flyout(anchor, t("layersTitle"), `<div class="mrp-tabs" role="tablist"><button type="button" role="tab" data-tab="layers">${esc(t("layersTab"))}</button><button type="button" role="tab" data-tab="paths">${esc(t("pathsTab"))}</button></div><div class="mrp-tabbody"></div>`, {
+      side: "below",
+      key: "layers",
+      mount: (box) => {
+        this.#renderLayersBody(box);
+        box.addEventListener("click", (event) => this.#layersClick(event, box));
+        box.addEventListener("change", (event) => this.#layersChange(event));
+      },
+    });
+  }
+
+  /** Repinta el cuerpo del panel de capas/caminos (lo llama refresh cuando cambian los datos). */
+  #renderLayersBody(box = this.#root?.querySelector(".mrp-flyout")) {
+    const body = box?.querySelector(".mrp-tabbody");
+    if (!body || this.#flyoutKey !== "layers") return;
+    if (body.contains(document.activeElement) && document.activeElement.matches("input[type=text], input:not([type])")) return; // no pisar lo que se está escribiendo
+    box.querySelectorAll("[data-tab]").forEach((b) => {
+      b.classList.toggle("on", b.dataset.tab === this.#flyTab);
+      b.setAttribute("aria-selected", String(b.dataset.tab === this.#flyTab));
+    });
+    body.innerHTML = this.#flyTab === "layers" ? this.#layersHTML() : this.#pathId ? this.#pathHTML(this.#pathId) : this.#charactersHTML();
+    this.#applyGlow();
+    this.#placeFlyout(box);
+  }
+
+  #layersHTML() {
+    const layers = this.#layerList();
+    const rows = layers.map((l) => `<div class="mrp-layer ${l.revealed ? "" : "off"}" data-id="${l.id}">
+      <input type="color" class="mrp-lcolor" value="${l.color}" aria-label="${esc(t("pinColor"))}">
+      <input type="text" class="mrp-lname" value="${esc(l.name)}" maxlength="40" aria-label="${esc(t("layerName"))}">
+      <span class="mrp-lcount" data-tooltip="${esc(t("layerPieces"))}">${Object.values(this.board.items ?? {}).filter((i) => i.layer === l.id).length}</span>
+      <button type="button" data-l="select" data-tooltip="${esc(t("layerSelect"))}" aria-label="${esc(t("layerSelect"))}"><i class="fa-solid fa-hand-pointer"></i></button>
+      <button type="button" data-l="toggle" class="mrp-eye ${l.revealed ? "on" : ""}" aria-pressed="${l.revealed}" data-tooltip="${esc(t(l.revealed ? "layerHide" : "layerReveal"))}" aria-label="${esc(t(l.revealed ? "layerHide" : "layerReveal"))}"><i class="fa-solid ${l.revealed ? "fa-eye" : "fa-eye-slash"}"></i></button>
+      <button type="button" data-l="del" class="danger" data-tooltip="${esc(t("layerDelete"))}" aria-label="${esc(t("layerDelete"))}"><i class="fa-solid fa-trash"></i></button></div>`).join("");
+    const base = Object.values(this.board.items ?? {}).filter((i) => !i.layer).length;
+    const next = layers.find((l) => !l.revealed);
+    return `<p class="mrp-fly-note">${esc(t("layersHint"))}</p>${rows || `<p class="mrp-fly-note">${esc(t("layersNone"))}</p>`}
+      <p class="mrp-fly-note">${esc(t("layersBase").replace("{n}", base))}</p>
+      <div class="mrp-fly-row"><button type="button" class="mrp-fly-more" data-l="new"><i class="fa-solid fa-plus"></i> ${esc(t("layerNew"))}</button>
+      <button type="button" class="mrp-fly-more primary" data-l="next" ${next ? "" : "disabled"}><i class="fa-solid fa-forward-step"></i> ${esc(t("layerRevealNext"))}${next ? `: ${esc(next.name)}` : ""}</button></div>`;
+  }
+
+  async #layersChange(event) {
+    const row = event.target.closest(".mrp-layer");
+    if (!row) return;
+    const data = event.target.classList.contains("mrp-lname") ? { name: event.target.value } : event.target.classList.contains("mrp-lcolor") ? { color: event.target.value } : null;
+    if (data) await this.#commit([{ op: "set", kind: "layers", id: row.dataset.id, data }]);
+    this.#renderLayersBody();
+  }
+
+  #layersClick(event, box) {
+    const tab = event.target.closest("[data-tab]")?.dataset.tab;
+    if (tab) {
+      this.#flyTab = tab;
+      this.#pathId = null;
+      return this.#renderLayersBody(box);
+    }
+    const l = event.target.closest("[data-l]");
+    if (l) {
+      const id = l.closest(".mrp-layer")?.dataset.id;
+      if (l.dataset.l === "new") return this.#commit([{ op: "set", kind: "layers", id: uid(), data: {} }]);
+      if (l.dataset.l === "next") {
+        const next = this.#layerList().find((x) => !x.revealed);
+        return next && this.#toggleLayer(next.id);
+      }
+      if (!id) return;
+      if (l.dataset.l === "toggle") return this.#toggleLayer(id);
+      if (l.dataset.l === "select") return this.#select(Object.entries(this.board.items ?? {}).filter(([, i]) => i.layer === id && !i.box).map(([k]) => k));
+      if (l.dataset.l === "del") return this.#commit([{ op: "remove", kind: "layers", id }]);
+    }
+    const p = event.target.closest("[data-p]");
+    if (p) this.#pathClick(p);
+  }
+
+  #toggleLayer(id) {
+    const layer = this.board.layers?.[id];
+    if (!layer) return;
+    const reveal = !layer.revealed;
+    this.#commit([{ op: "set", kind: "layers", id, data: { revealed: reveal } }]);
+    this.#say(`${layer.name}: ${t(reveal ? "layerRevealedMsg" : "layerHiddenMsg")}`);
+    if (reveal) ui.notifications.info(`${t("layerRevealedMsg")}: ${layer.name} (${Object.values(this.board.items ?? {}).filter((i) => i.layer === id).length} ${t("pieceMany")})`);
+  }
+
+  /** Menú para mover la selección a una capa (o quitarla de ella). */
+  #layerMenu(event) {
+    const ids = this.#selected();
+    if (!ids.length) return;
+    const set = (layer) => this.#commit(ids.map((id) => ({ op: "set", kind: "items", id, data: { layer } })));
+    this.#menu(event, [
+      ...this.#layerList().map((l) => ({ icon: "fa-solid fa-layer-group", label: `${esc(l.name)}${l.revealed ? "" : ` · ${esc(t("layerUnrevealed"))}`}`, fn: () => set(l.id) })),
+      this.#layerList().length && { separator: true },
+      { icon: "fa-regular fa-circle", label: t("layerNone"), fn: () => set("") },
+      { icon: "fa-solid fa-plus", label: t("layerNewWith"), fn: async () => {
+        const id = uid();
+        await this.#commit([{ op: "set", kind: "layers", id, data: {} }]);
+        set(id);
+      } },
+    ]);
+  }
+
+  /* ---------- caminos de personaje ---------- */
+
+  /** Nombre legible de una pieza (el de su documento si es una ficha o un diario vinculados). */
+  #pieceLabel(item) {
+    const doc = item.uuid ? fromUuidSync(item.uuid, { strict: false }) : null;
+    return item.name || doc?.name || item.reveal?.name || item.title || (item.text ? item.text.slice(0, 40) : "") || t(item.type);
+  }
+
+  #charactersHTML() {
+    const chars = Object.entries(this.board.items ?? {}).filter(([, i]) => i.type === "entity").sort((a, b) => a[1].x - b[1].x);
+    if (!chars.length) return `<p class="mrp-fly-note">${esc(t("pathsNone"))}</p>`;
+    return `<p class="mrp-fly-note">${esc(t("pathsHint"))}</p>` + chars.map(([id, item]) => {
+      const path = pathFrom(this.board, id);
+      const seen = path.filter((p) => this.#seenByPlayers(this.board.items[p.id])).length;
+      const active = this.#seenByPlayers(item);
+      return `<div class="mrp-char" data-id="${id}"><div class="mrp-charinfo"><strong>${esc(this.#pieceLabel(item))}</strong>
+        <small>${active ? esc(t("pathActive")) : esc(t("pathInactive"))} · ${seen}/${path.length} ${esc(t("pathRevealedWord"))}</small>
+        <span class="mrp-bar"><i style="width:${path.length ? Math.round((seen / path.length) * 100) : 0}%"></i></span></div>
+        <button type="button" class="mrp-fly-more small" data-p="open"><i class="fa-solid fa-route"></i> ${esc(t("pathOpen"))}</button></div>`;
+    }).join("");
+  }
+
+  #pathHTML(id) {
+    const item = this.board.items?.[id];
+    if (!item) return `<p class="mrp-fly-note">${esc(t("pathsNone"))}</p>`;
+    const path = pathFrom(this.board, id);
+    const seen = path.filter((p) => this.#seenByPlayers(this.board.items[p.id])).length;
+    const active = this.#seenByPlayers(item);
+    const eye = (pid, on) => `<button type="button" class="mrp-eye ${on ? "on" : ""}" data-p="toggle" data-pid="${pid}" aria-pressed="${on}" aria-label="${esc(t(on ? "layerHide" : "layerReveal"))}" data-tooltip="${esc(t(on ? "layerHide" : "layerReveal"))}"><i class="fa-solid ${on ? "fa-eye" : "fa-eye-slash"}"></i></button>`;
+    let tier = 0;
+    const rows = path.map((p) => {
+      const it = this.board.items[p.id];
+      const head = p.dist !== tier ? `<h5 class="mrp-group">${esc(t("pathLevel").replace("{n}", p.dist))}</h5>` : "";
+      tier = p.dist;
+      const thread = `<span class="mrp-tdot" style="--c:${THREAD_COLORS[p.link.color] ?? "#c0392b"}"></span>${p.link.label ? esc(p.link.label) : ""}`;
+      return `${head}<div class="mrp-pathrow ${this.#seenByPlayers(it) ? "" : "off"}"><i class="fa-solid ${TYPE_ICON[it.type] ?? "fa-circle"}"></i><div><strong>${esc(this.#pieceLabel(it))}</strong><small>${thread}</small></div>
+        <button type="button" data-p="locate" data-pid="${p.id}" aria-label="${esc(t("locate"))}" data-tooltip="${esc(t("locate"))}"><i class="fa-solid fa-location-crosshairs"></i></button>${eye(p.id, this.#seenByPlayers(it))}</div>`;
+    }).join("");
+    return `<button type="button" class="mrp-back" data-p="back"><i class="fa-solid fa-arrow-left"></i> ${esc(t("pathsTab"))}</button>
+      <h4 class="mrp-pathtitle">${esc(this.#pieceLabel(item))}</h4>
+      <div class="mrp-pathhead"><span class="mrp-bar big"><i style="width:${path.length ? Math.round((seen / path.length) * 100) : 0}%"></i></span><small>${seen}/${path.length} ${esc(t("pathRevealedWord"))}</small></div>
+      <div class="mrp-pathrow ${active ? "" : "off"} start"><i class="fa-solid fa-user"></i><div><strong>${esc(t("pathStart"))}</strong><small>${esc(active ? t("pathActive") : t("pathInactive"))}</small></div>${eye(id, active)}</div>
+      <div class="mrp-fly-row"><button type="button" class="mrp-fly-more primary" data-p="next" ${!active || seen < path.length ? "" : "disabled"}><i class="fa-solid fa-forward-step"></i> ${esc(t(active ? "pathNext" : "pathActivate"))}</button>
+      <button type="button" class="mrp-fly-more" data-p="level" ${active && seen < path.length ? "" : "disabled"}><i class="fa-solid fa-angles-right"></i> ${esc(t("pathLevelReveal"))}</button>
+      <button type="button" class="mrp-fly-more" data-p="all" ${seen < path.length || !active ? "" : "disabled"}><i class="fa-solid fa-eye"></i> ${esc(t("pathAll"))}</button>
+      <button type="button" class="mrp-fly-more" data-p="reset"><i class="fa-solid fa-eye-slash"></i> ${esc(t("pathReset"))}</button></div>${rows || `<p class="mrp-fly-note">${esc(t("pathEmpty"))}</p>`}`;
+  }
+
+  /** Mostrar u ocultar piezas a los jugadores, incluso si están en una capa sin revelar. */
+  #setSeen(ids, show) {
+    const ops = ids.filter((id) => this.board.items[id]).map((id) => ({ op: "set", kind: "items", id, data: show ? { hidden: false, shown: true } : { hidden: true, shown: false } }));
+    return this.#commit(ops);
+  }
+
+  #pathClick(button) {
+    const id = this.#pathId;
+    const act = button.dataset.p;
+    if (act === "open") {
+      this.#pathId = button.closest("[data-id]").dataset.id;
+      return this.#renderLayersBody();
+    }
+    if (act === "back") {
+      this.#pathId = null;
+      return this.#renderLayersBody();
+    }
+    if (act === "locate") return this.#locate(button.dataset.pid);
+    if (!id) return;
+    const item = this.board.items[id];
+    const path = pathFrom(this.board, id);
+    const hidden = path.filter((p) => !this.#seenByPlayers(this.board.items[p.id]));
+    if (act === "toggle") return this.#setSeen([button.dataset.pid], !this.#seenByPlayers(this.board.items[button.dataset.pid]));
+    if (act === "next") {
+      if (!this.#seenByPlayers(item)) return this.#setSeen([id], true).then(() => this.#say(t("pathActive")));
+      const next = hidden[0];
+      if (!next) return;
+      this.#say(`${t("pathRevealedMsg")}: ${this.#pieceLabel(this.board.items[next.id])}`);
+      return this.#setSeen([next.id], true);
+    }
+    if (act === "level") {
+      const dist = hidden[0]?.dist;
+      return dist && this.#setSeen(hidden.filter((p) => p.dist === dist).map((p) => p.id), true);
+    }
+    if (act === "all") return this.#setSeen([id, ...hidden.map((p) => p.id)], true);
+    if (act === "reset") return this.#setSeen(path.map((p) => p.id), false);
+  }
+
+  /** Resalta en el lienzo las piezas del camino que se está viendo. */
+  #applyGlow() {
+    this.#root?.querySelectorAll(".mrp-pathglow").forEach((el) => el.classList.remove("mrp-pathglow"));
+    if (this.#flyoutKey !== "layers" || this.#flyTab !== "paths" || !this.#pathId) return;
+    for (const id of [this.#pathId, ...pathFrom(this.board, this.#pathId).map((p) => p.id)]) this.#el(id)?.classList.add("mrp-pathglow");
+  }
+
+  /* ---------- la caja de elementos ---------- */
+
+  #boxEntries() {
+    return Object.entries(this.board.items ?? {}).filter(([, i]) => i.box && visibleTo(i, this.board));
+  }
+
+  #boxFlyout(anchor) {
+    this.#flyout(anchor, t("boxTitle"), `<input type="search" class="mrp-search" placeholder="${esc(t("search"))}" aria-label="${esc(t("search"))}"><div class="mrp-boxlist"></div><p class="mrp-fly-note">${esc(t("boxHint"))}</p>`, {
+      key: "box",
+      mount: (box) => {
+        this.#renderBox(box);
+        box.querySelector(".mrp-search").addEventListener("input", () => this.#renderBox(box));
+        box.addEventListener("click", (event) => {
+          const card = event.target.closest(".mrp-boxcard");
+          if (!card) return;
+          const id = card.dataset.id;
+          const act = event.target.closest("[data-b]")?.dataset.b;
+          if (act === "eye") return this.#setSeen([id], !this.#seenByPlayers(this.board.items[id]));
+          if (act === "del") return this.#commit([{ op: "remove", kind: "items", id }]);
+          this.#takeOut(id, this.#center());
+        });
+        box.addEventListener("dragstart", (event) => {
+          const card = event.target.closest(".mrp-boxcard");
+          if (!card) return;
+          event.dataTransfer.setData("text/plain", `mrp-box:${card.dataset.id}`);
+          event.dataTransfer.effectAllowed = "move";
+        });
+        box.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" && event.target.classList.contains("mrp-boxcard")) this.#takeOut(event.target.dataset.id, this.#center());
+        });
+      },
+    });
+  }
+
+  /** Repinta la lista de la caja (la llama refresh si el panel está abierto). */
+  #renderBox(box = this.#root?.querySelector(".mrp-flyout")) {
+    const list = box?.querySelector(".mrp-boxlist");
+    if (!list || this.#flyoutKey !== "box") return;
+    const q = box.querySelector(".mrp-search").value.trim().toLowerCase();
+    const entries = this.#boxEntries().filter(([, i]) => !q || `${this.#pieceLabel(i)} ${i.group ?? ""} ${i.text ?? ""}`.toLowerCase().includes(q));
+    const groups = new Map();
+    for (const [id, item] of entries) groups.set(item.group || t("boxNoGroup"), [...(groups.get(item.group || t("boxNoGroup")) ?? []), [id, item]]);
+    list.innerHTML = [...groups].map(([name, rows]) => `<h5 class="mrp-group">${esc(name)} · ${rows.length}</h5><div class="mrp-boxgrid">${rows.map(([id, item]) => boxCardHTML(id, item, this.board, game.user.isGM)).join("")}</div>`).join("") || `<p class="mrp-fly-note">${esc(t("boxEmpty"))}</p>`;
+    this.#placeFlyout(box);
+  }
+
+  /** Saca una pieza de la caja y la cuelga en la pizarra. */
+  async #takeOut(id, point) {
+    const item = this.board.items?.[id];
+    if (!item || !this.canEdit) return;
+    const w = widthOf(item);
+    await this.#commit([{ op: "set", kind: "items", id, data: { box: false, x: Math.round(point.x - w / 2), y: Math.round(point.y - w / 2), z: this.#topZ() + 1 } }]);
+    this.#select([id]);
+    this.#say(t("boxTaken"));
+  }
+
+  #putInBox() {
+    const ids = this.#selected();
+    if (!ids.length) return;
+    this.#sel.clear();
+    this.#commit(ids.map((id) => ({ op: "set", kind: "items", id, data: { box: true } })));
+    this.#say(t("boxStored"));
   }
 
   /* ---------- teclado ---------- */

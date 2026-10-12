@@ -1,5 +1,5 @@
 /** Pinta cada pieza de la pizarra (HTML) a partir de sus datos y de lo que la persona puede ver. */
-import { asset, DEFAULT_WIDTH, TABLES, PAPERS, FRAMES, DEFAULT_PIN_PRESET, look, rng } from "./rules.mjs";
+import { asset, DEFAULT_WIDTH, TABLES, PAPERS, FRAMES, DEFAULT_PIN_PRESET, look, rng, isVisibleTo } from "./rules.mjs";
 import { esc, t, ratioOf, holeOf, MANIFEST } from "./util.mjs";
 import { resolveJournal, resolveEntity } from "./refs.mjs";
 
@@ -18,7 +18,8 @@ const PIN_WIDTH = {
 const PIN_INSET = { chincheta: 14, clip: 8, grapa: 8, cinta: 0 };
 const TINTABLE = new Set(["chincheta", "cinta"]);
 
-export const visibleTo = (item) => game.user.isGM || (!item.hidden && (!item.owner || item.owner === game.user.id));
+/** ¿Debe pintarse esta pieza para esta persona? (oculta, privada ajena o de una capa sin revelar → no, salvo la Guardiana). */
+export const visibleTo = (item, board) => isVisibleTo(item, board, { isGM: game.user.isGM, userId: game.user.id });
 
 export function widthOf(item) {
   if (item.w) return item.w;
@@ -186,16 +187,44 @@ export function renderItem(id, item, board = {}) {
   const h = item.type === "photo" || item.type === "entity" ? w * ratioOf("fotos", item.frame) : item.type === "note" ? w : w * ratio;
   const g = pinsGeometry(L, w, h, hasMask ? L.mask : "none");
   const editable = TEXT_TYPES.has(item.type) && game.user.isGM !== undefined;
+  const layer = item.layer ? board.layers?.[item.layer] : null;
+  // La Guardiana ve atenuado lo que los jugadores no ven (oculto o de una capa sin revelar)
+  const concealed = game.user.isGM && !isVisibleTo(item, board, { isGM: false, userId: game.user.id });
+  // Insignias: solo iconos en la esquina inferior derecha (con tooltip), para no tapar nombres ni pies de foto
+  const badge = (icon, label, style = "") => `<span class="mrp-badge" data-tooltip="${esc(label)}" aria-label="${esc(label)}" ${style ? `style="${style}"` : ""}><i class="${icon}"></i></span>`;
   const badges = [
-    item.hidden ? `<span class="mrp-badge mrp-badge-hidden"><i class="fa-solid fa-eye-slash"></i> ${t("hiddenBadge")}</span>` : "",
-    item.type === "entity" && game.user.isGM && !item.uuid ? `<span class="mrp-badge mrp-badge-pending"><i class="fa-solid fa-link-slash"></i> ${t("unlinkedBadge")}</span>` : "",
-    item.type === "entity" && game.user.isGM && item.reveal ? `<span class="mrp-badge mrp-badge-shown"><i class="fa-solid fa-eye"></i> ${t("shownBadge")}</span>` : "",
-    item.owner ? `<span class="mrp-badge mrp-badge-private"><i class="fa-solid fa-lock"></i> ${t("privateBadge")}${game.user.isGM ? ` · ${esc(game.users.get(item.owner)?.name ?? "")}` : ""}</span>` : "",
+    game.user.isGM && item.hidden ? badge("fa-solid fa-eye-slash", t("hiddenBadge")) : "",
+    game.user.isGM && layer ? badge("fa-solid fa-layer-group", `${t("layerWord")}: ${layer.name}${layer.revealed ? "" : ` (${t("layerUnrevealed")})`}`, `--c:${layer.color}`) : "",
+    game.user.isGM && layer && !layer.revealed && item.shown ? badge("fa-solid fa-bolt", t("shownLayerBadge")) : "",
+    item.type === "entity" && game.user.isGM && !item.uuid ? badge("fa-solid fa-link-slash", t("unlinkedBadge")) : "",
+    item.type === "entity" && game.user.isGM && item.reveal ? badge("fa-solid fa-eye", t("shownBadge")) : "",
+    item.owner ? badge("fa-solid fa-lock", `${t("privateBadge")}${game.user.isGM ? ` · ${game.users.get(item.owner)?.name ?? ""}` : ""}`) : "",
   ].join("");
   const label = esc(item.title || item.text || ref?.title || t(item.type)).slice(0, 80);
-  const html = `<div class="mrp-item mrp-t-${item.type} ${item.hidden ? "mrp-hidden" : ""} ${item.type === "mark" && TABLES.mark.get(item.kind)?.multiply ? "mrp-multiply" : ""}" data-id="${id}" data-type="${item.type}" data-ax="${g.anchor.x.toFixed(1)}" data-ay="${g.anchor.y.toFixed(1)}" data-rot="${L.rot}" data-pins="${esc(JSON.stringify(pinSpecs(g, L.color)))}" tabindex="0" role="group" aria-label="${t(item.type)}: ${label}"
+  const html = `<div class="mrp-item mrp-t-${item.type} ${concealed ? "mrp-hidden" : ""} ${item.type === "mark" && TABLES.mark.get(item.kind)?.multiply ? "mrp-multiply" : ""}" data-id="${id}" data-type="${item.type}" data-ax="${g.anchor.x.toFixed(1)}" data-ay="${g.anchor.y.toFixed(1)}" data-rot="${L.rot}" data-pins="${esc(JSON.stringify(pinSpecs(g, L.color)))}" tabindex="0" role="group" aria-label="${t(item.type)}: ${label}"
     style="left:${item.x}px;top:${item.y}px;width:${w}px;z-index:${item.z};--w:${w}px">
     <div class="mrp-lift" style="transform:rotate(${L.rot}deg) skewX(${L.skew}deg)">${inner(id, item, ref, L, w, g, editable)}</div>
     ${badges ? `<div class="mrp-badges">${badges}</div>` : ""}</div>`;
-  return { html, sig: `${JSON.stringify(item)}|${JSON.stringify(preset)}|${ref?.sig ?? ""}|${game.user.isGM}` };
+  return { html, sig: `${JSON.stringify(item)}|${JSON.stringify(preset)}|${ref?.sig ?? ""}|${game.user.isGM}|${layer ? `${layer.name}${layer.color}${layer.revealed}` : ""}` };
+}
+
+/** Tarjeta de una pieza guardada en la caja (miniatura y nombre); la Guardiana ve además cuándo está oculta y puede revelarla o borrarla. */
+export function boxCardHTML(id, item, board, isGM) {
+  const ref = resolveItem(item);
+  const img = (src) => `<img src="${esc(src)}" alt="" draggable="false" loading="lazy">`;
+  let thumb = "";
+  let label = "";
+  if (item.type === "note") [thumb, label] = [img(asset("recortes", `postit-${item.color}`)), item.text];
+  else if (item.type === "clipping") [thumb, label] = [img(asset("recortes", item.paper)), item.title || item.text];
+  else if (item.type === "photo") [thumb, label] = [item.src ? img(item.src) : img(asset("fotos", item.frame)), item.text || t("photo")];
+  else if (item.type === "stamp") [thumb, label] = [img(asset("sellos", item.kind)), item.text || t("stamp")];
+  else if (item.type === "mark") [thumb, label] = [img(asset(TABLES.mark.get(item.kind)?.folder ?? "sellos", item.kind)), t("mark")];
+  else if (item.type === "entity") [thumb, label] = [img(ref.src || MYSTERY), ref.level === "none" ? "???" : ref.title];
+  else if (item.type === "journal") [thumb, label] = [img(asset("recortes", "papel-viejo-1")), ref.level === "none" ? t("unknown") : (ref.title ?? t("journal"))];
+  label = String(label || t(item.type)).slice(0, 60);
+  const seen = isVisibleTo(item, board, { isGM: false, userId: "" });
+  const tools = isGM
+    ? `<span class="mrp-boxtools"><button type="button" data-b="eye" aria-label="${esc(t(seen ? "layerHide" : "layerReveal"))}" data-tooltip="${esc(t(seen ? "layerHide" : "layerReveal"))}"><i class="fa-solid ${seen ? "fa-eye" : "fa-eye-slash"}"></i></button><button type="button" data-b="del" aria-label="${esc(t("remove"))}" data-tooltip="${esc(t("remove"))}"><i class="fa-solid fa-trash"></i></button></span>`
+    : "";
+  return `<div class="mrp-boxcard ${isGM && !seen ? "off" : ""}" draggable="true" tabindex="0" role="button" data-id="${id}" aria-label="${esc(`${t(item.type)}: ${label}`)}"><span class="mrp-boxthumb">${thumb}</span><em>${esc(label)}</em>${tools}</div>`;
 }

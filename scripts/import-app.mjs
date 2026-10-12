@@ -71,6 +71,10 @@ export class ImportApp extends foundry.applications.api.ApplicationV2 {
     ];
     content.innerHTML = `<div class="mrp-imp">
       <section class="mrp-step"><h3><span>1</span> ${esc(t("impStep1"))}</h3>
+        <fieldset class="mrp-modes"><legend>${esc(t("impMode"))}</legend>
+          <label class="mrp-mode"><input type="radio" name="mode" value="board" checked><span><strong>${esc(t("impModeBoard"))}</strong><small>${esc(t("impModeBoardHint"))}</small></span></label>
+          <label class="mrp-mode"><input type="radio" name="mode" value="box"><span><strong>${esc(t("impModeBox"))}</strong><small>${esc(t("impModeBoxHint"))}</small></span></label>
+        </fieldset>
         <p>${esc(t("impStep1Text"))}</p>
         <div class="mrp-imp-actions">
           <button type="button" class="mrp-btn primary" data-imp="copy"><i class="fa-regular fa-copy"></i> ${esc(t("impCopy"))}</button>
@@ -91,6 +95,10 @@ export class ImportApp extends foundry.applications.api.ApplicationV2 {
       </section>
       <section class="mrp-step"><h3><span>3</span> ${esc(t("impStep3"))}</h3>
         <div class="mrp-imp-opts">
+          <fieldset><legend>${esc(t("impPlace"))}</legend>
+            <label class="mrp-check"><input type="radio" name="place" value="board" checked> <span>${esc(t("impPlaceBoard"))}</span></label>
+            <label class="mrp-check"><input type="radio" name="place" value="box"> <span>${esc(t("impPlaceBox"))}</span></label>
+          </fieldset>
           <fieldset><legend>${esc(t("impTarget"))}</legend>${targets.map(([v, k], i) => `<label class="mrp-check"><input type="radio" name="target" value="${v}" ${i === 0 ? "checked" : ""}> <span>${esc(t(k))}</span></label>`).join("")}</fieldset>
           <fieldset><legend>${esc(t("impOptions"))}</legend>
             <label class="mrp-check"><input type="checkbox" name="link" checked> <span>${esc(t("impLink"))}</span></label>
@@ -101,7 +109,8 @@ export class ImportApp extends foundry.applications.api.ApplicationV2 {
         <div class="mrp-imp-actions"><button type="button" class="mrp-btn primary big" data-imp="import" disabled><i class="fa-solid fa-file-import"></i> ${esc(t("impRun"))}</button></div>
       </section></div>`;
     this.#root = content.querySelector(".mrp-imp");
-    this.#root.querySelector(".mrp-prompt").value = buildPrompt();
+    this.#root.querySelector(".mrp-prompt").value = buildPrompt({ mode: this.#promptMode() });
+    this.#root.querySelectorAll("[name=mode]").forEach((r) => r.addEventListener("change", () => (this.#root.querySelector(".mrp-prompt").value = buildPrompt({ mode: this.#promptMode() }))));
     this.#root.addEventListener("click", (event) => {
       const act = event.target.closest("[data-imp]")?.dataset.imp;
       if (act === "copy") this.#copy();
@@ -123,8 +132,12 @@ export class ImportApp extends foundry.applications.api.ApplicationV2 {
     });
   }
 
+  #promptMode() {
+    return this.#root.querySelector("[name=mode]:checked")?.value ?? "board";
+  }
+
   async #copy() {
-    const text = buildPrompt();
+    const text = buildPrompt({ mode: this.#promptMode() });
     try {
       await navigator.clipboard.writeText(text);
       ui.notifications.info(t("impCopied"));
@@ -137,8 +150,8 @@ export class ImportApp extends foundry.applications.api.ApplicationV2 {
   }
 
   #download() {
-    const url = URL.createObjectURL(new Blob([buildPrompt()], { type: "text/markdown" }));
-    const a = Object.assign(document.createElement("a"), { href: url, download: "mr-pizarra-prompt.md" });
+    const url = URL.createObjectURL(new Blob([buildPrompt({ mode: this.#promptMode() })], { type: "text/markdown" }));
+    const a = Object.assign(document.createElement("a"), { href: url, download: `mr-pizarra-prompt-${this.#promptMode()}.md` });
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   }
@@ -151,7 +164,7 @@ export class ImportApp extends foundry.applications.api.ApplicationV2 {
 
   #options() {
     const q = (n) => this.#root.querySelector(`[name=${n}]`);
-    return { target: this.#root.querySelector("[name=target]:checked")?.value ?? "new", link: q("link").checked, journals: q("journals").checked, style: q("style").checked };
+    return { place: this.#root.querySelector("[name=place]:checked")?.value ?? "board", target: this.#root.querySelector("[name=target]:checked")?.value ?? "new", link: q("link").checked, journals: q("journals").checked, style: q("style").checked };
   }
 
   /** Revisa la respuesta pegada y enseña qué se va a importar y qué problemas tiene. */
@@ -181,13 +194,14 @@ export class ImportApp extends foundry.applications.api.ApplicationV2 {
     const warns = result.issues.filter((i) => i.level === "aviso");
     const li = (i) => `<li class="mrp-issue ${i.level === "error" ? "error" : "warn"}"><i class="fa-solid ${i.level === "error" ? "fa-circle-xmark" : "fa-triangle-exclamation"}"></i> <b>${esc(i.where)}</b>: ${esc(i.message)}</li>`;
     report.innerHTML = `<div class="mrp-summary"><strong>${esc(result.title || t("importNew"))}</strong>
-      <span>${s.items} ${t("pieceMany")} · ${s.links} ${t("threadMany")} · ${s.hidden} ${t("impHiddenWord")}</span><span>${esc(byType)}</span></div>
+      <span>${s.items} ${t("pieceMany")} · ${s.links} ${t("threadMany")} · ${s.layers} ${t("impLayersWord")} · ${s.hidden} ${t("impHiddenWord")}</span><span>${esc(byType)}</span>${s.groups?.length ? `<span>${esc(s.groups.join(" · "))}</span>` : ""}</div>
       ${s.pending ? `<p class="mrp-linkinfo"><i class="fa-solid fa-link"></i> ${linked.length} ${t("impWillLink")}${linked.length ? ` (${esc(linked.slice(0, 6).join(", "))}${linked.length > 6 ? "…" : ""})` : ""}.
         <i class="fa-solid fa-link-slash"></i> ${unlinked.length + ambiguous.length} ${t("impWillPend")}${unlinked.length ? ` (${esc(unlinked.slice(0, 6).join(", "))}${unlinked.length > 6 ? "…" : ""})` : ""}${ambiguous.length ? `; ${ambiguous.length} ${t("impAmbiguous")}` : ""}.</p>` : ""}
       ${errors.length ? `<details open><summary>${errors.length} ${t("impErrors")}</summary><ul>${errors.map(li).join("")}</ul></details>` : ""}
       ${warns.length ? `<details><summary>${warns.length} ${t("impWarnings")}</summary><ul>${warns.map(li).join("")}</ul></details>` : ""}`;
     if (!result.items.length) return;
     this.#result = result;
+    this.#root.querySelector(`[name=place][value=${result.mode}]`).checked = true;
     this.#root.querySelector("[data-imp=import]").disabled = false;
   }
 
@@ -203,15 +217,30 @@ export class ImportApp extends foundry.applications.api.ApplicationV2 {
       const board = boardData(doc);
       const index = opts.link ? nameIndex() : null;
       const ids = new Map(result.items.map((it) => [it.ref, uid()]));
+      const inBox = opts.place === "box";
+      const layerIds = new Map(result.layers.map((l) => [l.ref, uid()]));
       let z = opts.target === "replace" ? 0 : Math.max(0, ...Object.values(board.items ?? {}).map((i) => i.z ?? 0));
       let folder = null;
       const ops = [];
-      if (opts.target === "replace") for (const id of Object.keys(board.items ?? {})) ops.push({ op: "remove", kind: "items", id });
+      if (opts.target === "replace") {
+        for (const id of Object.keys(board.items ?? {})) ops.push({ op: "remove", kind: "items", id });
+        for (const id of Object.keys(board.layers ?? {})) ops.push({ op: "remove", kind: "layers", id });
+      }
+      result.layers.forEach((l, i) => ops.push({ op: "set", kind: "layers", id: layerIds.get(l.ref), data: { name: l.name, color: l.color, revealed: l.revealed, order: Object.keys(board.layers ?? {}).length + i } }));
+      let slot = 0;
       const notes = { pending: [], journals: 0, linked: 0 };
       for (const it of result.items) {
         const data = { ...it.data };
         z += 1;
         data.z = z;
+        if (it.layerRef) data.layer = layerIds.get(it.layerRef);
+        if (inBox) data.box = true;
+        else if (data.x === undefined || data.y === undefined) {
+          // una caja que se coloca en la pizarra: cuadrícula inicial para poder recolocar a mano
+          data.x ??= 150 + (slot % 8) * 380;
+          data.y ??= 150 + Math.floor(slot / 8) * 420;
+          slot += 1;
+        }
         if (it.type === "entity") {
           const hit = index ? findDoc(index, data.name, data.kind) : { doc: null };
           if (hit.doc) {
@@ -233,7 +262,7 @@ export class ImportApp extends foundry.applications.api.ApplicationV2 {
         }
         ops.push({ op: "set", kind: "items", id: ids.get(it.ref), data });
       }
-      for (const link of result.links) ops.push({ op: "set", kind: "links", id: uid(), data: { from: ids.get(link.from), to: ids.get(link.to), color: link.color, style: link.style, label: link.label } });
+      for (const link of inBox ? [] : result.links) ops.push({ op: "set", kind: "links", id: uid(), data: { from: ids.get(link.from), to: ids.get(link.to), color: link.color, style: link.style, label: link.label } });
       if (opts.style) {
         const data = {};
         if (result.background) data.background = result.background;

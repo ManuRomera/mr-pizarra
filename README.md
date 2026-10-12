@@ -18,13 +18,22 @@ Una **pizarra de investigación colaborativa** para Foundry VTT. Funciona en **c
 8. **Sujeción por defecto** (barra superior): elige tipo, color y colocación del celo, las chinchetas o los clips para toda la pizarra; cada pieza o selección puede cambiarla desde su barra.
 9. **Accesibilidad** (barra superior): tamaño de texto, letra legible, alto contraste, reducir movimiento e interfaz grande; Tab recorre las piezas y los lectores de pantalla reciben avisos.
 
+## Revelar por capas y por caminos (Guardiana)
+
+- **Capas** (botón «Capas»): crea capas («Planteamiento», «Los sospechosos», «El giro»…), mete piezas en ellas con el botón de capas de la barra de selección y **revela una capa entera** con un clic o la siguiente en orden. Lo que está en una capa sin revelar es invisible para los jugadores; lo que no tiene capa, visible desde el principio.
+- **Caminos** (pestaña «Caminos»): activa un personaje y sigue las piezas unidas a él por hilos, de la más cercana a la más lejana, revelándolas **una a una**, por niveles o todas.
+
+## La caja de elementos
+
+Un botón del dock abre una **caja** de piezas guardadas, por secciones y con buscador. Los jugadores **las sacan y las colocan como quieran** (arrastrando o pulsando) y pueden devolverlas. La Guardiana controla qué hay disponible (capas y piezas ocultas) y lo va revelando. Se rellena importando en modo caja o con «Guardar en la caja» desde el menú de cualquier pieza.
+
 ## Importar una pizarra con una IA
 
 1. En la barra superior (o en el directorio de diarios) pulsa **Importar**.
-2. **Copia el prompt**, pégalo en tu IA favorita y adjunta la aventura. La IA extrae personas, lugares, pistas, documentos y conexiones, elige cómo representar cada cosa y los coloca en un JSON.
-3. **Pega la respuesta**, pulsa **Revisar** (te dice qué se vinculará y qué problemas hay) e **Importa**: a esta pizarra, reemplazándola o en una nueva.
+2. Elige **qué quieres que prepare la IA**: una **pizarra montada** (posiciones e hilos) o una **caja de elementos** (sin estructura, para que los jugadores las usen como quieran). **Copia el prompt** de ese modo, pégalo en tu IA favorita y adjunta la aventura. La IA extrae personas, lugares, pistas, documentos y conexiones, elige cómo representar cada cosa, los reparte en **capas de revelación** y los devuelve en un JSON.
+3. **Pega la respuesta**, pulsa **Revisar** (te dice qué se vinculará y qué problemas hay) e **Importa**: a esta pizarra, reemplazándola o en una nueva, y colocando las piezas en la pizarra o guardándolas en la caja.
 
-Las piezas que la IA marca como ocultas arrancan ocultas para los jugadores y las vas **revelando** con un clic. Los actores, escenas y objetos que no existan todavía quedan como **fichas sin vincular**: un aviso en la barra superior las lista para localizarlas, vincularlas o crear el actor. Los documentos se crean como diarios sin permiso para los jugadores. El prompt también está en [`docs/prompt-ia.md`](docs/prompt-ia.md).
+Las capas que la IA propone arrancan sin revelar (salvo la primera) y las vas **revelando** con un clic. Los actores, escenas y objetos que no existan todavía quedan como **fichas sin vincular**: un aviso en la barra superior las lista para localizarlas, vincularlas o crear el actor. Los documentos se crean como diarios sin permiso para los jugadores. Los prompts también están en [`docs/prompt-ia.md`](docs/prompt-ia.md) (pizarra montada) y [`docs/prompt-ia-caja.md`](docs/prompt-ia-caja.md) (caja de elementos).
 
 ## Lo que ven los jugadores
 

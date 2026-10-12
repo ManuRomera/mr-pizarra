@@ -126,8 +126,6 @@
 @keyframes mrp-in { 0% { opacity: 0; transform: scale(1.18); filter: brightness(2); } 100% { opacity: 1; transform: scale(1); filter: none; } }
 @media (prefers-reduced-motion: reduce) { .mrp-in { animation: none; } .mrp-lift { transition: none; } }
 
-.mrp-badges { position: absolute; left: 0; top: 100%; margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; pointer-events: none; }
-.mrp-badge { padding: 1px 8px; border-radius: 10px; background: #000b; color: #fff; font-size: 11px; white-space: nowrap; pointer-events: none; }
 
 .mrp-paper { position: relative; width: 100%; background-size: 100% 100%; background-repeat: no-repeat;
   -webkit-mask-size: 100% 100%; mask-size: 100% 100%; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; font-size: calc(var(--w) / 19 * var(--tscale, 1)); }
@@ -313,3 +311,66 @@
 .mrp-imp-opts fieldset { margin: 0; padding: 8px 12px; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; }
 .mrp-imp-opts legend { padding: 0 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #a99a80; }
 @media (max-width: 760px) { .mrp-imp-opts { grid-template-columns: 1fr; } }
+
+/* ---------- Insignias de estado: iconos en la esquina, sin tapar el nombre ---------- */
+.mrp-badges { position: absolute; right: -9px; bottom: -9px; z-index: 6; display: flex; flex-direction: row-reverse; gap: 3px; pointer-events: none; }
+.mrp-badge { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: rgba(15, 11, 8, 0.88); border: 1px solid rgba(255, 255, 255, 0.35); color: #fff; font-size: 11px; line-height: 1; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5); pointer-events: auto; }
+.mrp-badge[style*="--c"] { background: var(--c); border-color: #fff; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
+
+/* ---------- Capas, caminos y caja ---------- */
+.mrp-tool[data-count]:not([data-count=""])::after { content: attr(data-count); position: absolute; right: -5px; top: -5px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: #c0392b; color: #fff; font-size: 10px; font-weight: 700; line-height: 18px; text-align: center; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5); }
+.mrp-tabs { display: flex; gap: 4px; margin-bottom: 8px; padding: 3px; border-radius: 11px; background: rgba(255, 255, 255, 0.06); }
+.mrp-tabs button { flex: 1; height: 30px; margin: 0; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer; }
+.mrp-tabs button.on { background: linear-gradient(145deg, #f3c969, #d9a441); color: #1a1208; }
+.mrp-layer { display: flex; align-items: center; gap: 6px; padding: 5px 4px; border-bottom: 1px solid var(--line); }
+.mrp-layer.off .mrp-lname { opacity: 0.6; }
+.mrp-lcolor { flex: 0 0 auto; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; }
+.mrp-lname { flex: 1; min-width: 0; height: 30px; margin: 0; padding: 0 8px; border: 1px solid transparent; border-radius: 8px; background: rgba(255, 255, 255, 0.05); color: #fff; font-size: 13px; }
+.mrp-lname:focus { border-color: var(--brass-2); outline: none; }
+.mrp-lcount { flex: 0 0 auto; min-width: 22px; text-align: center; font-size: 11px; color: var(--muted); }
+.mrp-layer button, .mrp-pathrow button, .mrp-boxtools button { flex: 0 0 auto; width: 30px; height: 30px; padding: 0; margin: 0; border: 0; border-radius: 8px; background: rgba(255, 255, 255, 0.07); color: var(--ink); cursor: pointer; font-size: 13px; }
+.mrp-layer button:hover, .mrp-pathrow button:hover { background: rgba(217, 164, 65, 0.3); }
+.mrp-eye.on { background: rgba(217, 164, 65, 0.35); color: #ffe3a6; }
+.mrp-layer button.danger { color: #ff9c8f; }
+.mrp-fly-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.mrp-fly-row .mrp-fly-more { flex: 1 1 140px; margin: 0; width: auto; justify-content: center; }
+.mrp-fly-more.primary { border: 1px solid #d9a441; background: rgba(217, 164, 65, 0.22); color: #ffe3a6; font-weight: 700; }
+.mrp-fly-more:disabled { opacity: 0.4; cursor: not-allowed; }
+.mrp-fly-more.small { width: auto; margin: 0; padding: 6px 10px; }
+.mrp-char { display: flex; align-items: center; gap: 8px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
+.mrp-charinfo { flex: 1; min-width: 0; }
+.mrp-charinfo strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-size: 13px; }
+.mrp-charinfo small, .mrp-pathrow small { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; }
+.mrp-bar { display: block; height: 5px; margin-top: 4px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.mrp-bar i { display: block; height: 100%; background: linear-gradient(90deg, #d9a441, #f3c969); }
+.mrp-bar.big { height: 8px; margin: 0 0 3px; }
+.mrp-back { display: inline-flex; align-items: center; gap: 6px; width: auto; height: 28px; margin: 0 0 6px; padding: 0 10px; border: 0; border-radius: 8px; background: rgba(255, 255, 255, 0.07); color: var(--ink); font-size: 12px; cursor: pointer; }
+.mrp-pathtitle { margin: 2px 0 6px; border: 0; font-size: 15px; color: #fff; }
+.mrp-pathrow { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.mrp-pathrow > i { flex: 0 0 auto; width: 18px; text-align: center; color: var(--brass-2); }
+.mrp-pathrow > div { flex: 1; min-width: 0; }
+.mrp-pathrow strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: #fff; }
+.mrp-pathrow.off { opacity: 0.6; }
+.mrp-pathrow.start { background: rgba(217, 164, 65, 0.1); border-radius: 8px; }
+.mrp-tdot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+.mrp-pathglow .mrp-lift { outline: 3px solid #f3c969; outline-offset: 6px; box-shadow: 0 0 22px 6px rgba(243, 201, 105, 0.6); }
+.mrp-flyout:has(.mrp-boxlist) { width: 440px; }
+.mrp-boxgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+.mrp-boxcard { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px 5px; border: 1px solid transparent; border-radius: 11px; background: rgba(255, 255, 255, 0.05); cursor: grab; transition: background 0.12s, transform 0.12s; }
+.mrp-boxcard:hover, .mrp-boxcard:focus-visible { background: rgba(217, 164, 65, 0.2); border-color: rgba(243, 201, 105, 0.5); transform: translateY(-1px); outline: none; }
+.mrp-boxcard.off { opacity: 0.55; }
+.mrp-boxthumb { display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 1; border-radius: 8px; background: rgba(0, 0, 0, 0.25); overflow: hidden; }
+.mrp-boxthumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.mrp-boxcard em { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-style: normal; font-size: 11px; text-align: center; }
+.mrp-boxtools { position: absolute; top: 3px; right: 3px; display: none; gap: 3px; }
+.mrp-boxcard:hover .mrp-boxtools, .mrp-boxcard:focus-within .mrp-boxtools { display: flex; }
+.mrp-boxtools button { width: 24px; height: 24px; font-size: 11px; background: rgba(0, 0, 0, 0.7); }
+
+.mrp-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 8px; padding: 0; border: 0; }
+.mrp-modes legend { padding: 0 0 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #a99a80; }
+.mrp-mode { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; background: rgba(255, 255, 255, 0.04); cursor: pointer; }
+.mrp-mode:has(input:checked) { border-color: #d9a441; background: rgba(217, 164, 65, 0.16); }
+.mrp-mode input { margin-top: 3px; accent-color: #d9a441; }
+.mrp-mode strong { display: block; color: #fff; font-size: 13px; }
+.mrp-mode small { display: block; margin-top: 2px; color: #a99a80; font-size: 11px; line-height: 1.35; }
+@media (max-width: 760px) { .mrp-modes { grid-template-columns: 1fr; } }

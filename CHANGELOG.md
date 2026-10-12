@@ -1,5 +1,14 @@
 # Cambios
 
+## 0.5.0 · Capas de revelación, caminos de personaje y caja de elementos
+
+- **Etiquetas de estado fuera del nombre:** oculta, privada, sin vincular, visible para todos y capa pasan a ser **iconos redondos en la esquina inferior derecha** de la pieza (con tooltip), ya no tapan el nombre ni el pie de foto.
+- **Capas de revelación** (botón «Capas» de la barra superior, solo la Guardiana): agrupa las piezas en capas con nombre y color y **revela una capa entera con un clic**, o «Revelar la siguiente» para avanzar por etapas. Las piezas se asignan a una capa desde la barra de selección o el menú; las de una capa sin revelar se ven atenuadas para la Guardiana y no existen para los jugadores. Las que no están en ninguna capa se ven desde el principio.
+- **Caminos de personaje** (pestaña «Caminos»): elige un personaje, **actívalo** y sigue su camino: las piezas unidas a él por hilos, de la más cercana a la más lejana, con el progreso y la etiqueta de cada hilo. Revela **la siguiente pieza**, **el nivel entero**, **todo el camino**, o cada pieza por separado, aunque estén en una capa sin revelar. El camino se resalta en el lienzo. También desde el menú de cualquier pieza con hilos («Ver su camino…»).
+- **Caja de elementos** (botón del dock): piezas guardadas en una caja, agrupadas por secciones y con buscador, que los jugadores **sacan y colocan como quieran** (arrastrando o pulsando) y pueden **devolver** («Guardar en la caja»). Respeta capas y piezas ocultas: la Guardiana decide qué hay disponible y lo va revelando; ve el estado de cada pieza y puede revelarla o borrarla desde la caja. El dock muestra cuántas hay.
+- **Importar en dos modos:** «Una pizarra montada» (posiciones e hilos) o «Una caja de elementos» (sin estructura). Cada modo tiene su **prompt** (docs/prompt-ia.md y docs/prompt-ia-caja.md) y la ventana cambia el que se copia. Ambos piden a la IA **capas de revelación** y, en el modo pizarra, caminos coherentes de hilos. La respuesta decide el modo por defecto, pero puedes elegir si las piezas van a la pizarra o a la caja.
+- Deshacer (Ctrl/Cmd+Z) también cubre las capas.
+
 ## 0.4.0 · Desvelar fichas e importar una pizarra con IA
 
 - **Fichas visibles sin dar permiso:** al colgar un actor, escena u objeto que algún jugador no puede ver, la Guardiana decide si mostrar su nombre e imagen a todos. Puede cambiarlo en cualquier momento desde el menú de la pieza («Mostrar nombre e imagen a todos» / «Dejar de mostrarlo sin permiso»). La Guardiana ve una insignia «Visible para todos». La pieza guarda una instantánea de nombre e imagen, porque quien no tiene permiso ni siquiera recibe el documento.

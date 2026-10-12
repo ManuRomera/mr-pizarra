@@ -74,14 +74,40 @@ test("normalizeImport: lo importado pasa planOps como lo pasaría la hoja", () =
   assert.equal(plan.board.items["aaaaaaaa00000001"].uuid, "");
 });
 
-test("buildPrompt incluye el catálogo real y la estructura del JSON", () => {
-  const p = buildPrompt();
-  for (const id of [...PAPERS, ...FRAMES, ...STAMPS, ...MARKS, ...PINS, ...BACKGROUNDS].map((e) => e.id)) assert.ok(p.includes(`"${id}"`), `falta ${id}`);
-  for (const k of Object.keys(PIN_LAYOUTS)) assert.ok(p.includes(`"${k}"`), `falta ${k}`);
-  for (const frag of [IMPORT_FORMAT, "hidden", "showToAll", "3200 × 2000", "\"links\"", "sin vincular"]) assert.ok(p.includes(frag), `falta «${frag}»`);
-  // el ejemplo del prompt es una importación válida
-  const example = /## 7[\s\S]*?```json\n([\s\S]*?)```/.exec(p)[1];
-  const r = normalizeImport(JSON.parse(example));
-  assert.equal(r.issues.filter((i) => i.level === "error").length, 0, JSON.stringify(r.issues));
-  assert.equal(r.items.length, 5);
+test("capas, grupos y modo caja", () => {
+  const r = normalizeImport({ mode: "box", layers: [{ ref: "a", name: "Inicio", revealed: true }, { ref: "b", name: "Giro" }, { ref: "a", name: "dup" }, { ref: "c" }],
+    items: [{ ref: "n", type: "note", text: "x", layer: "a", group: "Pistas" }, { ref: "m", type: "note", text: "y", layer: "zzz" }], links: [{ from: "n", to: "m" }] });
+  assert.equal(r.mode, "box");
+  assert.deepEqual(r.layers.map((l) => [l.ref, l.revealed]), [["a", true], ["b", false]]);
+  assert.equal(r.items[0].layerRef, "a");
+  assert.equal(r.items[0].data.group, "Pistas");
+  assert.equal(r.items[1].layerRef, undefined);
+  assert.equal(r.items[0].data.x, undefined, "en modo caja no se colocan");
+  assert.equal(r.links.length, 0);
+  const text = r.issues.map((i) => i.message).join("|");
+  assert.match(text, /no está definida/);
+  assert.match(text, /En modo caja no hay hilos/);
+  assert.match(text, /necesita «ref» y «name»/);
+  assert.equal(normalizeImport({ items: [] }).mode, "board");
+});
+
+test("buildPrompt incluye el catálogo real y la estructura del JSON (los dos modos)", () => {
+  for (const mode of ["board", "box"]) {
+    const p = buildPrompt({ mode });
+    for (const id of [...PAPERS, ...FRAMES, ...STAMPS, ...MARKS, ...PINS, ...BACKGROUNDS].map((e) => e.id)) assert.ok(p.includes(`"${id}"`), `${mode}: falta ${id}`);
+    for (const k of Object.keys(PIN_LAYOUTS)) assert.ok(p.includes(`"${k}"`), `${mode}: falta ${k}`);
+    for (const frag of [IMPORT_FORMAT, "layers", "revealed", "sin vincular"]) assert.ok(p.includes(frag), `${mode}: falta «${frag}»`);
+    const example = /## \d+\. Ejemplo[\s\S]*?```json\n([\s\S]*?)```/.exec(p)[1];
+    const r = normalizeImport(JSON.parse(example));
+    assert.equal(r.issues.filter((i) => i.level === "error").length, 0, `${mode}: ${JSON.stringify(r.issues)}`);
+    assert.equal(r.mode, mode);
+    assert.equal(r.layers.length, 2);
+    assert.ok(r.items.every((i) => i.layerRef), `${mode}: todas las piezas del ejemplo llevan capa`);
+  }
+  const board = buildPrompt();
+  for (const frag of ["3200 × 2000", "\"links\"", "Caminos", "camino"]) assert.ok(board.includes(frag), `falta «${frag}»`);
+  const box = buildPrompt({ mode: "box" });
+  for (const frag of ["no hay posiciones ni hilos", "group", "por sí sola"]) assert.ok(box.includes(frag), `falta «${frag}»`);
+  assert.ok(!box.includes("3200 × 2000"));
+  assert.equal(normalizeImport(JSON.parse(/## \d+\. Ejemplo[\s\S]*?```json\n([\s\S]*?)```/.exec(board)[1])).items.length, 5);
 });
