@@ -1,0 +1,23 @@
+{
+  "id": "mr-pizarra",
+  "title": "MR- Pizarra",
+  "description": "Pizarra de investigación colaborativa para cualquier sistema y ambientación: corcho, hilos de colores, fotos, notas, recortes de periódico de formas irregulares, sellos y documentos de tus diarios colgados con sus permisos (lo que los jugadores no pueden leer aparece censurado).",
+  "version": "0.1.0",
+  "compatibility": { "minimum": "13", "verified": "13.351" },
+  "authors": [{ "name": "Manu Romera", "url": "https://github.com/ManuRomera" }],
+  "url": "https://github.com/ManuRomera/mr-pizarra",
+  "manifest": "https://github.com/ManuRomera/mr-pizarra/releases/latest/download/module.json",
+  "download": "https://github.com/ManuRomera/mr-pizarra/releases/latest/download/mr-pizarra.zip",
+  "readme": "https://github.com/ManuRomera/mr-pizarra#readme",
+  "changelog": "https://github.com/ManuRomera/mr-pizarra/blob/main/CHANGELOG.md",
+  "bugs": "https://github.com/ManuRomera/mr-pizarra/issues",
+  "license": "LICENSE",
+  "media": [{ "type": "cover", "url": "https://raw.githubusercontent.com/ManuRomera/mr-pizarra/main/assets/ui/banner.webp" }],
+  "esmodules": ["scripts/main.mjs"],
+  "styles": ["styles/mr-pizarra.css"],
+  "languages": [
+    { "lang": "es", "name": "Español", "path": "lang/es.json" },
+    { "lang": "en", "name": "English", "path": "lang/en.json" }
+  ],
+  "socket": true
+}

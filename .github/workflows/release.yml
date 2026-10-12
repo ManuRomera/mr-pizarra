@@ -1,0 +1,32 @@
+name: Publicar
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Comprobar que la etiqueta coincide con module.json
+        run: test "v$(node -p "require('./module.json').version")" = "$GITHUB_REF_NAME"
+      - run: npm test
+      - run: for f in scripts/*.mjs; do node --check "$f"; done
+      - name: Empaquetar
+        run: |
+          mkdir -p dist
+          zip -r dist/mr-pizarra.zip module.json scripts styles lang assets LICENSE README.md CHANGELOG.md
+          cp module.json dist/module.json
+      - name: Notas de la versión
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="## $version" 'index($0, v)==1{p=1;next} /^## /{p=0} p' CHANGELOG.md > dist/notas.md
+          test -s dist/notas.md || { echo "CHANGELOG.md no tiene una sección «## $version»"; exit 1; }
+      - name: Publicar release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/mr-pizarra.zip dist/module.json --title "MR- Pizarra $GITHUB_REF_NAME" --notes-file dist/notas.md

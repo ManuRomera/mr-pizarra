@@ -1,0 +1,143 @@
+/* MR- Pizarra. Nunca se pisa la fuente de iconos de Foundry: los <i class="fa-*"> conservan la suya. */
+
+/* ---------- Directorio ---------- */
+.mrp-new { flex: 0 0 auto; margin-top: 4px; }
+.mrp-dir-icon { color: #b8352c; font-size: 0.85em; }
+
+/* ---------- Ventana ---------- */
+.mrp-window .window-content.mrp-content { padding: 0; overflow: hidden; }
+.mrp-root { position: relative; display: flex; height: 100%; background: #211b15; color: #eadfc8; }
+
+.mrp-tools { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 6px; background: #17120e; border-right: 1px solid #000; z-index: 5; overflow-y: auto; }
+.mrp-tools hr { width: 70%; margin: 4px 0; border: 0; border-top: 1px solid #3a3027; }
+.mrp-tools button { flex: 0 0 auto; width: 36px; height: 36px; padding: 0; margin: 0; border: 1px solid #3a3027; border-radius: 8px; background: #2c251d; color: #eadfc8; cursor: pointer; line-height: 1; }
+.mrp-tools button:hover, .mrp-tools button:focus-visible { background: #43382b; color: #fff; outline: 2px solid #e9b44c; outline-offset: 1px; }
+.mrp-tools button.active { background: #8c2f26; border-color: #c0392b; }
+.mrp-readonly .mrp-tools button[data-tool="note"], .mrp-readonly .mrp-tools button[data-tool="clipping"], .mrp-readonly .mrp-tools button[data-tool="photo"],
+.mrp-readonly .mrp-tools button[data-tool="doc"], .mrp-readonly .mrp-tools button[data-tool="stamp"], .mrp-readonly .mrp-tools button[data-tool="mark"],
+.mrp-readonly .mrp-tools button[data-tool="bg"], .mrp-readonly .mrp-tools button[data-tool="thread"] { opacity: 0.35; }
+
+.mrp-viewport { position: relative; flex: 1; overflow: hidden; cursor: grab; touch-action: none; background: radial-gradient(circle at 50% 40%, #3a2f24, #17120e); }
+.mrp-panning .mrp-viewport { cursor: grabbing; }
+.mrp-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+.mrp-surface { position: absolute; inset: 0; background-size: cover; background-position: center; background-color: #7a5a3a;
+  box-shadow: 0 0 0 14px #5b3d25, 0 0 0 17px #2a1b0e, 0 20px 70px 20px #000c, inset 0 0 90px #0007; }
+.mrp-threads { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+.mrp-items { position: absolute; inset: 0; pointer-events: none; }
+
+/* ---------- Hilos ---------- */
+.mrp-thread-line { fill: none; stroke-width: 3.2; stroke-linecap: round; }
+.mrp-thread-shadow { fill: none; stroke: #000; stroke-opacity: 0.3; stroke-width: 3; stroke-linecap: round; filter: blur(2px); }
+.mrp-thread-hit { fill: none; stroke: transparent; stroke-width: 18; pointer-events: stroke; cursor: pointer; }
+.mrp-threading .mrp-thread-hit { pointer-events: none; }
+.mrp-thread text { font: 700 15px "Courier New", monospace; fill: #fff; paint-order: stroke; stroke: #000; stroke-width: 4px; stroke-linejoin: round; }
+
+/* ---------- Piezas ---------- */
+.mrp-item { position: absolute; pointer-events: auto; cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; }
+.mrp-item:focus-visible { outline: none; }
+.mrp-item:focus-visible .mrp-lift { outline: 3px solid #4a90e2; outline-offset: 5px; }
+.mrp-lift { position: relative; transform-origin: 50% 35%; filter: drop-shadow(2px 4px 4px rgba(0, 0, 0, 0.45)); transition: filter 0.15s; }
+.mrp-item:hover .mrp-lift { filter: drop-shadow(3px 7px 7px rgba(0, 0, 0, 0.5)); }
+.mrp-dragging { cursor: grabbing; }
+.mrp-dragging .mrp-lift { filter: drop-shadow(7px 15px 10px rgba(0, 0, 0, 0.5)); }
+.mrp-selected .mrp-lift { outline: 2px dashed #f3c969; outline-offset: 6px; }
+.mrp-remote .mrp-lift { outline: 2px solid #5aa9ff; outline-offset: 6px; }
+.mrp-threading .mrp-item { cursor: crosshair; }
+.mrp-threadsrc .mrp-lift { outline: 3px solid #c0392b; outline-offset: 6px; }
+.mrp-hidden { opacity: 0.55; }
+.mrp-hidden .mrp-lift { outline: 2px dashed #9a9a9a; outline-offset: 6px; }
+.mrp-in { animation: mrp-in 0.55s ease-out; }
+@keyframes mrp-in { 0% { opacity: 0; transform: scale(1.18); filter: brightness(2); } 100% { opacity: 1; transform: scale(1); filter: none; } }
+@media (prefers-reduced-motion: reduce) { .mrp-in { animation: none; } .mrp-lift { transition: none; } }
+
+.mrp-handle { display: none; position: absolute; right: -10px; bottom: -10px; width: 16px; height: 16px; border-radius: 50%; background: #e9b44c; border: 2px solid #2a1f10; cursor: nwse-resize; z-index: 3; }
+.mrp-selected .mrp-handle { display: block; }
+.mrp-readonly .mrp-handle { display: none !important; }
+.mrp-badge { position: absolute; left: 0; bottom: -26px; padding: 1px 8px; border-radius: 10px; background: #000b; color: #fff; font-size: 11px; white-space: nowrap; pointer-events: none; }
+
+.mrp-paper { position: relative; width: 100%; background-size: 100% 100%; background-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%; mask-size: 100% 100%; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; font-size: calc(var(--w) / 22); }
+.mrp-text { position: absolute; inset: 10% 9% 9%; overflow: hidden; color: #2b2620; }
+.mrp-copy { white-space: pre-wrap; overflow-wrap: anywhere; }
+.mrp-headline { margin: 0 0 0.35em; padding: 0 0 0.2em; border: 0; border-bottom: 2px solid currentColor; font: 700 1.5em/1.05 Georgia, "Times New Roman", serif; letter-spacing: -0.01em; text-transform: uppercase; }
+
+.mrp-style-periodico .mrp-copy { columns: 2; column-gap: 0.9em; column-rule: 1px solid rgba(0, 0, 0, 0.28); font: 400 0.68em/1.28 "Times New Roman", Times, serif; text-align: justify; hyphens: auto; mix-blend-mode: multiply; }
+.mrp-style-telegrama .mrp-text { color: #3b2f22; }
+.mrp-style-telegrama .mrp-headline, .mrp-style-telegrama .mrp-copy { font-family: "Courier New", Courier, monospace; text-transform: uppercase; letter-spacing: 0.04em; }
+.mrp-style-telegrama .mrp-copy { font-weight: 600; font-size: 0.78em; line-height: 1.55; }
+.mrp-style-telegrama .mrp-headline { font-size: 1.05em; }
+.mrp-style-ficha .mrp-headline { font: 700 1em/1.2 "Courier New", Courier, monospace; letter-spacing: 0.05em; border-bottom-width: 1px; }
+.mrp-style-ficha .mrp-copy { font: 400 0.82em/1.5 "Courier New", Courier, monospace; }
+.mrp-style-manuscrito .mrp-text, .mrp-note .mrp-text { font-family: "Segoe Print", "Bradley Hand", "Noteworthy", "Comic Sans MS", cursive; color: #243b73; }
+.mrp-style-manuscrito .mrp-headline { font: 700 1.2em/1.15 "Segoe Print", "Bradley Hand", "Noteworthy", "Comic Sans MS", cursive; text-transform: none; border: 0; letter-spacing: 0; }
+.mrp-style-manuscrito .mrp-copy { font-size: 0.82em; line-height: 1.45; }
+.mrp-style-papel .mrp-text { color: #3a2d1c; }
+.mrp-style-papel .mrp-headline { font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif; text-transform: none; font-size: 1.3em; }
+.mrp-style-papel .mrp-copy { font: italic 0.84em/1.4 "Palatino Linotype", "Book Antiqua", Palatino, serif; }
+.mrp-style-fotocopia .mrp-text { color: #f3f0e8; }
+.mrp-style-fotocopia .mrp-copy { font: 400 0.8em/1.4 "Courier New", Courier, monospace; }
+.mrp-style-sobre .mrp-text { inset: 22% 12% 12%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.mrp-style-sobre .mrp-copy { font: 500 0.95em/1.35 "Segoe Print", "Bradley Hand", "Noteworthy", cursive; color: #3a2d1c; }
+
+.mrp-note .mrp-text { inset: 15% 10% 8%; font-size: calc(var(--w) / 11); line-height: 1.2; }
+.mrp-note .mrp-text.mrp-copy { white-space: pre-wrap; }
+
+.mrp-photo .mrp-picbox { position: absolute; overflow: hidden; background: #2a2a2a; }
+.mrp-photo .mrp-pic { display: block; width: 100%; height: 100%; object-fit: cover; }
+.mrp-photo .mrp-frameimg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.mrp-caption { position: absolute; left: 8%; right: 8%; font: 500 calc(var(--w) / 15) "Segoe Print", "Bradley Hand", "Noteworthy", "Comic Sans MS", cursive; color: #2d2a28; text-align: center; overflow: hidden; line-height: 1.1; pointer-events: none; }
+.mrp-caption.mrp-in-frame { display: flex; align-items: center; justify-content: center; }
+.mrp-caption:not(.mrp-in-frame) { top: 100%; margin-top: 6px; padding: 2px 6px; background: #efe6cf; border-radius: 2px; box-shadow: 0 1px 3px #0006; }
+
+.mrp-stampwrap { position: relative; mix-blend-mode: normal; }
+.mrp-stampimg { display: block; width: 100%; }
+.mrp-stamptext { position: absolute; inset: 14%; display: flex; align-items: center; justify-content: center; text-align: center; font: 700 calc(var(--w) / 8) "Courier New", Courier, monospace; letter-spacing: 0.08em; text-transform: uppercase; transform: rotate(-2deg); overflow: hidden; line-height: 1.05; }
+.mrp-markwrap { background: none; }
+.mrp-markimg { display: block; width: 100%; }
+.mrp-t-mark .mrp-lift { filter: none; }
+.mrp-item.mrp-multiply { mix-blend-mode: multiply; }
+
+.mrp-redact { display: block; }
+.mrp-redact i { display: block; height: 0.8em; margin: 0.4em 0; background: #1b1612; border-radius: 1px; }
+.mrp-seal { position: absolute; left: 50%; top: 58%; transform: translate(-50%, -50%) rotate(-12deg); padding: 0.1em 0.6em; border: 3px double #b8352c; color: #b8352c; font: 700 1.4em "Courier New", Courier, monospace; letter-spacing: 0.12em; text-transform: uppercase; mix-blend-mode: multiply; white-space: nowrap; }
+.mrp-question { font: 700 4.5em/1 Georgia, serif; color: rgba(70, 45, 20, 0.5); }
+.mrp-tag { margin-top: 0.4em; font: 600 0.9em "Courier New", monospace; text-transform: uppercase; color: #5a3d20; }
+
+/* ---------- Adornos ---------- */
+.mrp-pin { position: absolute; left: calc(50% + var(--pinx)); top: 0; width: max(22px, calc(var(--w) * var(--pins))); height: auto; pointer-events: none; z-index: 2; filter: drop-shadow(1px 3px 2px rgba(0, 0, 0, 0.5)); transform: translate(-50%, -50%) rotate(var(--pinr)); }
+.mrp-pin-chincheta { top: 4%; transform: translate(-50%, -62%) rotate(var(--pinr)); }
+.mrp-pin-clip { left: 28%; top: 0; transform: translate(-50%, -28%) rotate(var(--pinr)); }
+.mrp-pin-grapa { top: 3%; transform: translate(-50%, -50%) rotate(var(--pinr)); }
+.mrp-pin-alfiler { transform: translate(-50%, -50%) rotate(calc(var(--pinr) - 55deg)); }
+
+/* ---------- HUD, ayuda y menú ---------- */
+.mrp-hud { display: none; position: absolute; left: 56px; right: 12px; top: 10px; z-index: 6; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 9px; background: #000c; color: #fff; font-size: 13px; pointer-events: auto; }
+.mrp-hud.on { display: flex; flex-wrap: wrap; }
+.mrp-hud > span { margin-right: auto; }
+.mrp-dot { width: 22px; height: 22px; padding: 0; margin: 0; border-radius: 50%; border: 2px solid #fff6; background: var(--c); cursor: pointer; }
+.mrp-dot.on { border-color: #fff; box-shadow: 0 0 0 2px #000; }
+.mrp-style { width: auto; height: auto; padding: 2px 9px; margin: 0; border-radius: 12px; border: 1px solid #fff5; background: transparent; color: #fff; cursor: pointer; line-height: 1.3; }
+.mrp-style.on { background: #fff; color: #000; }
+.mrp-hint { position: absolute; left: 56px; right: 0; bottom: 18px; text-align: center; color: #fffa; font-size: 14px; pointer-events: none; text-shadow: 0 1px 3px #000; }
+.mrp-menu { position: absolute; z-index: 20; display: flex; flex-direction: column; min-width: 240px; padding: 4px; border: 1px solid #000; border-radius: 9px; background: #1f1a15; box-shadow: 0 10px 30px #000b; }
+.mrp-menu button { display: flex; align-items: center; gap: 9px; width: 100%; height: auto; margin: 0; padding: 7px 10px; border: 0; border-radius: 6px; background: transparent; color: #eadfc8; text-align: left; cursor: pointer; line-height: 1.2; }
+.mrp-menu button:hover, .mrp-menu button:focus-visible { background: #43382b; outline: none; }
+.mrp-menu button.danger { color: #ff9c8f; }
+.mrp-menu button i { width: 1.2em; text-align: center; }
+
+/* ---------- Formularios (diálogos) ---------- */
+.mrp-form { display: flex; flex-direction: column; gap: 4px; max-height: 68vh; overflow-y: auto; padding-right: 4px; }
+.mrp-form textarea { resize: vertical; }
+.mrp-choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 6px; max-height: 220px; overflow-y: auto; width: 100%; padding: 2px; }
+.mrp-choice { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; }
+.mrp-choice input { position: absolute; opacity: 0; pointer-events: none; }
+.mrp-thumb { display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 1; border: 2px solid transparent; border-radius: 7px; background: #cfc6b4; overflow: hidden; font-size: 1.4em; color: #4a4033; }
+.mrp-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.mrp-thumb:has(.mrp-maskthumb) { background: #6b5a48; }
+.mrp-choice input:checked + .mrp-thumb { border-color: #c0392b; box-shadow: 0 0 0 2px #c0392b55; }
+.mrp-choice input:focus-visible + .mrp-thumb { outline: 2px solid #4a90e2; }
+.mrp-choice em { font-style: normal; font-size: 0.72em; text-align: center; line-height: 1.1; }
+.mrp-group { grid-column: 1 / -1; margin: 0.4em 0 0; font-size: 0.85em; opacity: 0.7; }
+.mrp-swatches { grid-template-columns: repeat(auto-fill, minmax(44px, 54px)); }
+.mrp-note-amarillo { background: #efd958; } .mrp-note-rosa { background: #e48fa4; } .mrp-note-verde { background: #9bcb78; } .mrp-note-azul { background: #7bb6d6; }
+.mrp-browse { flex: 0 0 auto; width: auto; margin-left: 6px; }
