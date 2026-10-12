@@ -10,6 +10,11 @@ Módulo de Foundry VTT (v13+, probado en 13.351) independiente del sistema. Id `
 - `scripts/strings.mjs` — único origen de textos; `npm run lang` genera `lang/*.json` (el inglés se edita a mano en `lang/en.json`).
 - `tools/prepare-assets.py` — limpia y convierte a WebP las imágenes del generador (necesita Pillow y numpy). Escribe `assets/manifest.json` (tamaños, huecos de marcos, fondos en mosaico).
 
+## Cómo funciona la selección y el grupo
+- `#sel` (ids) + caja `.mrp-sel` con asas. Al mover/escalar/girar se aplica una **vista previa por CSS** (`transform` en cada `.mrp-item`, ver `#setPreview`) y los hilos se recalculan con ese mismo estado (`#anchor`); al soltar, `#commit` envía un lote de operaciones. Escala y giro son alrededor del centro de la caja.
+- Historial: `#commit` calcula la inversa (`#inverse`) antes de enviar: valores anteriores, lo creado se quita y lo quitado vuelve **con sus hilos, piezas antes que hilos**. Un campo que la pieza no tenía guardado (`w`, `rot`, `hidden`, `owner`) se restaura con su valor efectivo.
+- `requestAnimationFrame` se pausa con la pestaña en segundo plano: lo esencial (hilos, selección, barra) se pinta de forma síncrona; solo el minimapa va por rAF.
+
 ## Datos
 `flags.mr-pizarra.board` en un JournalEntry: `{background, locked, items:{id:{type,x,y,z,…}}, links:{id:{from,to,color,style,label}}}`. Una clave por pieza: nunca se reescribe el objeto entero.
 

@@ -2,7 +2,7 @@
   "id": "mr-pizarra",
   "title": "MR- Pizarra",
   "description": "Pizarra de investigación colaborativa para cualquier sistema y ambientación: corcho, hilos de colores, fotos, notas, recortes de periódico de formas irregulares, sellos y documentos de tus diarios colgados con sus permisos (lo que los jugadores no pueden leer aparece censurado).",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "compatibility": { "minimum": "13", "verified": "13.351" },
   "authors": [{ "name": "Manu Romera", "url": "https://github.com/ManuRomera" }],
   "url": "https://github.com/ManuRomera/mr-pizarra",

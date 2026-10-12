@@ -144,7 +144,7 @@ export function renderItem(id, item) {
   const html = `<div class="mrp-item mrp-t-${item.type} ${item.hidden ? "mrp-hidden" : ""} ${item.type === "mark" && TABLES.mark.get(item.kind)?.multiply ? "mrp-multiply" : ""}" data-id="${id}" data-type="${item.type}" data-fx="${L.pinFx}" data-pinx="${L.pinX}" data-pint="${geo?.top ?? 8}" data-rot="${L.rot}" tabindex="0" role="group" aria-label="${label}"
     style="left:${item.x}px;top:${item.y}px;width:${w}px;z-index:${item.z};--w:${w}px">
     <div class="mrp-lift" style="transform:rotate(${L.rot}deg) skewX(${L.skew}deg)">${inner(id, item, ref, L, w, pad)}${pinHTML}</div>
-    <span class="mrp-handle" title="${t("rotation")}"></span>${badges}</div>`;
+    ${badges}</div>`;
   return { html, sig: `${JSON.stringify(item)}|${ref?.sig ?? ""}|${game.user.isGM}` };
 }
 

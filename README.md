@@ -9,11 +9,12 @@ Una **pizarra de investigación colaborativa** para Foundry VTT. Funciona en **c
 ## Cómo se usa
 
 1. En la pestaña **Diarios**, pulsa **Nueva pizarra** (o clic derecho sobre un diario → *Abrir como pizarra*). Cada pizarra es un diario, así que los permisos de siempre mandan: quien tenga Observador puede trabajar en ella.
-2. Con las herramientas de la izquierda cuelgas **notas, recortes, fotos, sellos y marcas**. Un clic derecho en una pieza abre su menú (editar, duplicar, ocultar, quitar…). Se arrastra para moverla; con ella seleccionada, el círculo dorado cambia su tamaño.
-3. **Arrastra desde la barra lateral** diarios, páginas, actores, escenas u objetos: quedan colgados y respetan los permisos de cada persona.
-4. **Quitar**: selecciona una pieza y pulsa **Suprimir**; `Ctrl/Cmd+Z` la devuelve.
-5. **Hilo**: elige color y estilo, pulsa dos piezas y se unen. Un clic en el hilo permite ponerle etiqueta o quitarlo.
-6. **Fondo**: 20 fondos por ambientación (corcho, victoriano, casa maldita, Oeste, sala de guerra, ciberpunk, nave espacial…).
+2. Con las herramientas de la izquierda cuelgas **notas, recortes, fotos, sellos y marcas**. Un clic derecho en una pieza abre su menú (editar, duplicar, ocultar, quitar…).
+3. **Selecciona** una pieza con un clic, varias con Mayús/Ctrl o con un recuadro arrastrando en vacío (Ctrl/Cmd+A, todas). Todo lo seleccionado se mueve junto; las **esquinas** de la caja lo escalan y el **círculo superior** lo gira, y los hilos se adaptan. Una barra sobre la selección ofrece girar, escalar, alinear, duplicar y más.
+4. **Arrastra desde la barra lateral** diarios, páginas, actores, escenas u objetos: quedan colgados y respetan los permisos de cada persona.
+5. **Quitar**: selecciona y pulsa **Suprimir**. **Ctrl/Cmd+Z** deshace cualquier cambio.
+6. **Hilo**: elige color y estilo, pulsa dos piezas y se unen. Un clic en el hilo permite ponerle etiqueta o quitarlo.
+7. **Fondo**: 20 fondos por ambientación (corcho, victoriano, casa maldita, Oeste, sala de guerra, ciberpunk, nave espacial…).
 
 ## Lo que ven los jugadores
 

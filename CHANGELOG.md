@@ -1,5 +1,16 @@
 # Cambios
 
+## 0.2.0 · Selección múltiple, giro y una interfaz nueva
+
+- **Selección múltiple:** clic con Mayús/Ctrl, recuadro arrastrando en vacío y Ctrl/Cmd+A.
+- **Grupo como una sola cosa:** arrastra cualquier pieza seleccionada y se mueve todo con las mismas relaciones. Las esquinas de la caja de selección escalan el grupo entero y el círculo superior lo gira (Mayús: de 15° en 15°); los hilos se adaptan solos porque siguen a sus piezas.
+- **Girar cualquier pieza**, también una sola, con el mismo círculo.
+- **Alinear y distribuir** (izquierda, centro, derecha, arriba, medio, abajo; repartir en horizontal y vertical).
+- **Duplicar** la selección conservando los hilos que unen a sus piezas (Ctrl/Cmd+D).
+- **Deshacer** (Ctrl/Cmd+Z) para cualquier cambio: mover, escalar, girar, crear, borrar (con sus hilos), fondo y bloqueo. Flechas del teclado para afinar de 1 en 1 px (Mayús: 10).
+- **Interfaz rehecha:** dock de herramientas por grupos con atajos, barra superior con el título y los datos del caso, barra contextual sobre la selección, minimapa navegable, zoom con porcentaje, modo mano (H o Espacio), menús de cristal oscuro, panel de ayuda con los atajos (?) y asas de tamaño constante al hacer zoom.
+- El movimiento en directo ahora muestra a la vez todas las piezas de un grupo.
+
 ## 0.1.1 · Ajustes tras la primera prueba
 
 - El texto de recortes y documentos ya cae dentro del papel: cada contorno tiene su zona segura medida y la letra se encoge hasta que cabe. El contorno automático solo elige los que dejan hueco.
