@@ -42,6 +42,7 @@
 .mrp-surface { position: absolute; inset: 0; background-color: #7a5a3a; background-position: center;
   box-shadow: 0 0 0 14px #5b3d25, 0 0 0 17px #2a1b0e, 0 20px 70px 20px #000c, inset 0 0 120px #0008; }
 .mrp-threads { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: visible; } /* por delante de las piezas */
+.mrp-pins { position: absolute; inset: 0; z-index: 3; pointer-events: none; } /* sujeciones: por encima de los hilos */
 .mrp-items { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
 
 /* Selección: caja con asas */

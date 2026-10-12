@@ -1,5 +1,9 @@
 # Cambios
 
+## 0.3.2 · Las puntas de los hilos, tras la sujeción
+
+- Los hilos siguen pasando por delante de las piezas, pero ahora las **chinchetas, el celo, los clips y las grapas quedan por encima del hilo**: las puntas se ven sujetas por ellas. Las sujeciones van en una capa propia y siguen a su pieza al moverla, escalarla o girarla (conservan su tamaño fijo).
+
 ## 0.3.1 · Vista con el botón derecho e hilos por delante
 
 - **Botón derecho mantenido sobre el fondo y arrastrar** mueve la vista. Sobre una pieza o un hilo, el botón derecho sigue abriendo su menú.

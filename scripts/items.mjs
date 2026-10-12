@@ -79,14 +79,15 @@ export function pinsGeometry(L, w, h, maskId) {
   return { pins: out, padTop: top, padBottom: bottom, anchor: first ? { x: first.cx, y: first.cy } : { x: w / 2, y: 10 } };
 }
 
-function pinHTML(g, color) {
-  return g.pins
-    .map(({ pin, cx, cy, width, rot }) => {
-      const tint = color && TINTABLE.has(pin.kind);
-      const url = asset("adornos", pin.id);
-      return `<span class="mrp-pin mrp-pin-${pin.kind} ${tint ? "mrp-tinted" : ""}" style="left:${cx.toFixed(1)}px;top:${cy.toFixed(1)}px;width:${width}px;--r:${rot}deg;${tint ? `--tint:${color};--mask:url(${foundry.utils.getRoute(url)})` : ""}"><img src="${url}" alt="" draggable="false"></span>`;
-    })
-    .join("");
+/** Una sujeción por entrada: posición del centro dentro de la pieza (px), ancho, giro y teñido. Las pinta `pinElementHTML` en una capa propia. */
+function pinSpecs(g, color) {
+  return g.pins.map(({ pin, cx, cy, width, rot }) => ({ id: pin.id, kind: pin.kind, x: Math.round(cx * 10) / 10, y: Math.round(cy * 10) / 10, w: width, r: rot, tint: color && TINTABLE.has(pin.kind) ? color : "" }));
+}
+
+/** HTML de una sujeción para la capa que va por encima de los hilos (posición y giro los pone la hoja). */
+export function pinElementHTML(spec, itemId, hidden) {
+  const url = asset("adornos", spec.id);
+  return `<span class="mrp-pin mrp-pin-${spec.kind} ${spec.tint ? "mrp-tinted" : ""} ${hidden ? "mrp-hidden" : ""}" data-item="${itemId}" data-x="${spec.x}" data-y="${spec.y}" data-r="${spec.r}" style="width:${spec.w}px;${spec.tint ? `--tint:${spec.tint};--mask:url(${foundry.utils.getRoute(url)})` : ""}"><img src="${url}" alt="" draggable="false"></span>`;
 }
 
 /** Rectángulo de texto (px) dentro de una pieza: la zona segura del contorno, sin pisar los adornos. */
@@ -190,9 +191,9 @@ export function renderItem(id, item, board = {}) {
     item.owner ? `<span class="mrp-badge mrp-badge-private"><i class="fa-solid fa-lock"></i> ${t("privateBadge")}${game.user.isGM ? ` · ${esc(game.users.get(item.owner)?.name ?? "")}` : ""}</span>` : "",
   ].join("");
   const label = esc(item.title || item.text || ref?.title || t(item.type)).slice(0, 80);
-  const html = `<div class="mrp-item mrp-t-${item.type} ${item.hidden ? "mrp-hidden" : ""} ${item.type === "mark" && TABLES.mark.get(item.kind)?.multiply ? "mrp-multiply" : ""}" data-id="${id}" data-type="${item.type}" data-ax="${g.anchor.x.toFixed(1)}" data-ay="${g.anchor.y.toFixed(1)}" data-rot="${L.rot}" tabindex="0" role="group" aria-label="${t(item.type)}: ${label}"
+  const html = `<div class="mrp-item mrp-t-${item.type} ${item.hidden ? "mrp-hidden" : ""} ${item.type === "mark" && TABLES.mark.get(item.kind)?.multiply ? "mrp-multiply" : ""}" data-id="${id}" data-type="${item.type}" data-ax="${g.anchor.x.toFixed(1)}" data-ay="${g.anchor.y.toFixed(1)}" data-rot="${L.rot}" data-pins="${esc(JSON.stringify(pinSpecs(g, L.color)))}" tabindex="0" role="group" aria-label="${t(item.type)}: ${label}"
     style="left:${item.x}px;top:${item.y}px;width:${w}px;z-index:${item.z};--w:${w}px">
-    <div class="mrp-lift" style="transform:rotate(${L.rot}deg) skewX(${L.skew}deg)">${inner(id, item, ref, L, w, g, editable)}${pinHTML(g, L.color)}</div>
+    <div class="mrp-lift" style="transform:rotate(${L.rot}deg) skewX(${L.skew}deg)">${inner(id, item, ref, L, w, g, editable)}</div>
     ${badges}</div>`;
   return { html, sig: `${JSON.stringify(item)}|${JSON.stringify(preset)}|${ref?.sig ?? ""}|${game.user.isGM}` };
 }

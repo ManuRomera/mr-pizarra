@@ -10,7 +10,7 @@
  */
 import { ID, FLAG, BOARD, BACKGROUNDS, PAPERS, MASKS, PINS, STAMPS, MARKS, FRAMES, NOTE_COLORS, THREAD_COLORS, THREAD_STYLES, TABLES, PIN_LAYOUTS, DEFAULT_PIN_PRESET, planOps, look, asset } from "./rules.mjs";
 import { t, esc, uid, MANIFEST } from "./util.mjs";
-import { renderItem, visibleTo, widthOf } from "./items.mjs";
+import { renderItem, visibleTo, widthOf, pinElementHTML } from "./items.mjs";
 
 const BLOCKED_PAPERS = new Set(["sobre", "fotocopia"]);
 const PIN_COLORS = ["#c0392b", "#2c6fbb", "#2f8f5b", "#e0b020", "#2b2b2b", "#f4f1e8", "#7d4fb5", "#e8742a"];
@@ -359,7 +359,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
         <div class="mrp-viewport">
           <div class="mrp-world" style="width:${BOARD.width}px;height:${BOARD.height}px">
             <div class="mrp-surface"></div>
-            <div class="mrp-items"></div><svg class="mrp-threads" width="${BOARD.width}" height="${BOARD.height}" aria-hidden="true"></svg>
+            <div class="mrp-items"></div><svg class="mrp-threads" width="${BOARD.width}" height="${BOARD.height}" aria-hidden="true"></svg><div class="mrp-pins" aria-hidden="true"></div>
             <div class="mrp-sel" hidden><span class="mrp-h" data-h="nw"></span><span class="mrp-h" data-h="ne"></span><span class="mrp-h" data-h="se"></span><span class="mrp-h" data-h="sw"></span><span class="mrp-stem"></span><span class="mrp-h mrp-h-rot" data-h="rot"><i class="fa-solid fa-rotate"></i></span></div>
           </div>
           <div class="mrp-marquee" hidden></div>
@@ -543,9 +543,50 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     this.#root.querySelector(".mrp-meta").textContent = `${seen.size} ${t(seen.size === 1 ? "pieceOne" : "pieceMany")} · ${links} ${t(links === 1 ? "threadOne" : "threadMany")}`;
     this.#first = false;
     this.#hud();
+    this.#buildPins();
     this.#drawThreads();
     this.#drawSel();
     this.#schedule();
+  }
+
+  /** Las sujeciones van en su propia capa, por encima de los hilos: así las puntas de un hilo quedan tras las chinchetas y el celo. */
+  #buildPins() {
+    const layer = this.#root.querySelector(".mrp-pins");
+    layer.innerHTML = [...this.#root.querySelectorAll(".mrp-item")]
+      .map((el) => {
+        let specs = [];
+        try {
+          specs = JSON.parse(el.dataset.pins || "[]");
+        } catch {
+          /* sin sujeciones */
+        }
+        return specs.map((spec) => pinElementHTML(spec, el.dataset.id, el.classList.contains("mrp-hidden"))).join("");
+      })
+      .join("");
+    this.#drawPins();
+  }
+
+  /** Coloca cada sujeción sobre su pieza (con la vista previa de mover/escalar/girar). Tamaño fijo: no se escalan con la pieza. */
+  #drawPins() {
+    const layer = this.#root?.querySelector(".mrp-pins");
+    if (!layer) return;
+    const items = new Map();
+    for (const pin of layer.children) {
+      const id = pin.dataset.item;
+      if (!items.has(id)) items.set(id, this.#el(id));
+      const el = items.get(id);
+      pin.hidden = !el;
+      if (!el) continue;
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      const pv = this.#preview.get(id);
+      const f = pv?.f ?? 1;
+      const rot = (Number(el.dataset.rot) || 0) + (pv?.th ?? 0);
+      const p = rotate((Number(pin.dataset.x) - w / 2) * f, (Number(pin.dataset.y) - h / 2) * f, rot);
+      pin.style.left = `${(pv?.cx ?? el.offsetLeft + w / 2) + p.x}px`;
+      pin.style.top = `${(pv?.cy ?? el.offsetTop + h / 2) + p.y}px`;
+      pin.style.setProperty("--r", `${Number(pin.dataset.r) + rot}deg`);
+    }
   }
 
   /** Repinta hilos, selección y minimapa como mucho una vez por fotograma. */
@@ -687,6 +728,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
   }
 
   #drawThreads() {
+    this.#drawPins();
     const svg = this.#root.querySelector(".mrp-threads");
     const links = this.board.links ?? {};
     const parts = [];

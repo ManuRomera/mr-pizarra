@@ -17,6 +17,7 @@ Módulo de Foundry VTT (v13+, probado en 13.351) independiente del sistema. Id `
 
 ## Sujeciones, texto y accesibilidad
 - `look(id, item, preset)` (rules.mjs) devuelve `pins[]` ya resueltos desde la pieza y la sujeción por defecto de la pizarra (`board.pinPreset`); `PIN_LAYOUTS` define las colocaciones. `items.mjs` las coloca sobre el **borde real** del contorno (`manifest.edge`: perfiles arriba/abajo/izquierda/derecha) y calcula el hueco que reservan para el texto: los centrados reservan entero, los de esquina solo una franja.
+- Capas del lienzo (de abajo arriba): fondo, piezas, hilos (svg), **sujeciones** (`.mrp-pins`, `#buildPins`/`#drawPins`: cada una se coloca desde `data-pins` de su pieza, con la vista previa de mover/escalar/girar), caja de selección. Así el hilo queda entre el papel y la chincheta.
 - Tamaño fijo de chinchetas/clips/grapas; el color se tiñe con una capa `mix-blend-mode: color` + máscara sobre la imagen en grises (la URL de la máscara en una variable CSS va **absoluta** con `foundry.utils.getRoute`).
 - Edición directa: `contenteditable="plaintext-only"` sobre los `[data-field]`; se guarda con `textContent` (nunca `innerText`: aplica `text-transform`).
 - `fitText` solo mide con la ventana en pantalla: se llama en `_onRender` y en el primer `ResizeObserver` (`#fitAll`). El texto de sellos y pies se escala con `--fit`, el resto con `em`.
