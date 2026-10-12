@@ -17,26 +17,26 @@ const list = (folder, ids) => ids.map(([id, name, extra]) => ({ id, name, folder
 /** Fondos agrupados por ambientación. */
 export const BACKGROUNDS = Object.freeze([
   ...list("fondos", [
-    ["corcho-claro", "Corcho clásico", { group: "Clásicos" }],
-    ["corcho-noir", "Corcho noir", { group: "Clásicos" }],
-    ["carton-archivo-policial", "Archivo policial", { group: "Clásicos" }],
-    ["lienzo-yute", "Lienzo de yute", { group: "Clásicos" }],
-    ["pizarra-escolar-tiza", "Pizarra de tiza", { group: "Clásicos" }],
-    ["plano-azul-blueprint", "Plano azul", { group: "Clásicos" }],
-    ["papel-victoriano-verde", "Salón victoriano", { group: "Época" }],
-    ["empapelado-hotel-art-deco", "Hotel art déco", { group: "Época" }],
-    ["papel-pintado-lovecraft", "Casa maldita", { group: "Época" }],
-    ["mapa-antiguo-mundo", "Mapa antiguo", { group: "Época" }],
-    ["pergamino-nautico", "Carta náutica", { group: "Época" }],
-    ["piedra-medieval", "Muro medieval", { group: "Época" }],
-    ["madera-oeste", "Tablones del Oeste", { group: "Época" }],
-    ["papel-washi-oriental", "Papel washi", { group: "Época" }],
-    ["mesa-sala-de-guerra", "Sala de guerra", { group: "Moderno y futuro" }],
-    ["moqueta-anos-80", "Oficina de los 80", { group: "Moderno y futuro" }],
-    ["ladrillo-industrial", "Ladrillo industrial", { group: "Moderno y futuro" }],
-    ["hormigon-ciberpunk", "Hormigón ciberpunk", { group: "Moderno y futuro" }],
-    ["panel-sci-fi", "Panel de nave", { group: "Moderno y futuro" }],
-    ["cuero-steampunk", "Cuero steampunk", { group: "Moderno y futuro" }],
+    ["corcho-claro", "Corcho clásico", { group: "Clásicos", size: 620 }],
+    ["corcho-noir", "Corcho noir", { group: "Clásicos", size: 620 }],
+    ["carton-archivo-policial", "Archivo policial", { group: "Clásicos", size: 900 }],
+    ["lienzo-yute", "Lienzo de yute", { group: "Clásicos", size: 560 }],
+    ["pizarra-escolar-tiza", "Pizarra de tiza", { group: "Clásicos", size: 1000 }],
+    ["plano-azul-blueprint", "Plano azul", { group: "Clásicos", size: 900 }],
+    ["papel-victoriano-verde", "Salón victoriano", { group: "Época", size: 1000 }],
+    ["empapelado-hotel-art-deco", "Hotel art déco", { group: "Época", size: 1100 }],
+    ["papel-pintado-lovecraft", "Casa maldita", { group: "Época", size: 1000 }],
+    ["mapa-antiguo-mundo", "Mapa antiguo", { group: "Época", size: 0 }],
+    ["pergamino-nautico", "Carta náutica", { group: "Época", size: 0 }],
+    ["piedra-medieval", "Muro medieval", { group: "Época", size: 1100 }],
+    ["madera-oeste", "Tablones del Oeste", { group: "Época", size: 1200 }],
+    ["papel-washi-oriental", "Papel washi", { group: "Época", size: 900 }],
+    ["mesa-sala-de-guerra", "Sala de guerra", { group: "Moderno y futuro", size: 1100 }],
+    ["moqueta-anos-80", "Oficina de los 80", { group: "Moderno y futuro", size: 600 }],
+    ["ladrillo-industrial", "Ladrillo industrial", { group: "Moderno y futuro", size: 1100 }],
+    ["hormigon-ciberpunk", "Hormigón ciberpunk", { group: "Moderno y futuro", size: 1000 }],
+    ["panel-sci-fi", "Panel de nave", { group: "Moderno y futuro", size: 1000 }],
+    ["cuero-steampunk", "Cuero steampunk", { group: "Moderno y futuro", size: 1100 }],
   ]),
 ]);
 
@@ -63,6 +63,8 @@ export const PAPERS = Object.freeze(
     ["sobre-carta", "Sobre de carta", { style: "sobre" }],
   ]),
 );
+/** Contornos que `auto` puede elegir: los que dejan un hueco amplio para el texto (medido en manifest.safe). */
+export const AUTO_MASKS = Object.freeze(["rasgado-1", "rasgado-3", "rasgado-5", "rasgado-7", "tijera-1", "tijera-4", "quemado-2"]);
 /** Contornos irregulares (máscaras). `auto` elige uno según el id de la pieza. */
 export const MASKS = Object.freeze(
   list("bordes", [
@@ -85,14 +87,13 @@ export const FRAMES = Object.freeze(
 /** Adornos que sujetan las piezas. */
 export const PINS = Object.freeze(
   list("adornos", [
-    ...["roja", "azul", "verde", "amarilla", "negra", "blanca"].map((c) => [`chincheta-${c}`, `Chincheta ${c}`, { kind: "chincheta" }]),
+    ...["roja", "azul", "verde", "amarilla", "blanca"].map((c) => [`chincheta-${c}`, `Chincheta ${c}`, { kind: "chincheta" }]),
     ["clip-metal", "Clip metálico", { kind: "clip" }],
     ["clip-negro", "Clip negro", { kind: "clip" }],
     ...["rojo", "azul", "verde", "mostaza"].map((c) => [`cinta-washi-${c}`, `Cinta washi ${c}`, { kind: "cinta" }]),
     ["cinta-adhesiva-1", "Cinta adhesiva I", { kind: "cinta" }],
     ["cinta-adhesiva-2", "Cinta adhesiva II", { kind: "cinta" }],
     ["grapa", "Grapa", { kind: "grapa" }],
-    ["alfiler-dorado", "Alfiler dorado", { kind: "alfiler" }],
   ]),
 );
 /** Sellos con texto (el marco es imagen, el texto lo pinta el módulo). */
@@ -158,9 +159,9 @@ const pick = (random, arr) => arr[Math.floor(random() * arr.length)];
 const AUTO_PINS = Object.freeze({
   note: ["chincheta-roja", "chincheta-azul", "chincheta-verde", "chincheta-amarilla", "grapa"],
   clipping: ["cinta-washi-rojo", "cinta-washi-azul", "cinta-washi-verde", "cinta-washi-mostaza", "cinta-adhesiva-1", "cinta-adhesiva-2", "clip-metal"],
-  photo: ["chincheta-roja", "chincheta-negra", "cinta-adhesiva-1", "cinta-adhesiva-2", "clip-negro"],
+  photo: ["chincheta-roja", "cinta-adhesiva-1", "cinta-adhesiva-2", "clip-negro"],
   journal: ["clip-metal", "clip-negro", "cinta-adhesiva-1", "chincheta-roja"],
-  entity: ["chincheta-roja", "chincheta-azul", "alfiler-dorado"],
+  entity: ["chincheta-roja", "chincheta-azul"],
 });
 
 /** Giro, máscara y adorno de una pieza, resueltos desde su id cuando están en «auto». */
@@ -168,11 +169,23 @@ export function look(id, item) {
   const random = rng(`${id}:${item.type}`);
   const rot = Number.isFinite(item.rot) ? item.rot : Math.round((random() * 2 - 1) * 5 * 10) / 10;
   let mask = item.mask ?? "auto";
-  if (mask === "auto") mask = ["clipping", "journal"].includes(item.type) ? pick(random, MASKS.filter((m) => m.kind !== "quemado")).id : "none";
+  if (mask === "auto") mask = ["clipping", "journal"].includes(item.type) ? pick(random, MASKS.filter((m) => AUTO_MASKS.includes(m.id))).id : "none";
   let pin = item.pin ?? "auto";
   if (pin === "auto") pin = AUTO_PINS[item.type] ? pick(random, AUTO_PINS[item.type]) : "none";
-  // Desplazamiento y giro del adorno: nunca quedan igual de centrados.
-  return { rot, mask, pin, pinX: Math.round((random() * 2 - 1) * 14), pinRot: Math.round((random() * 2 - 1) * 14), skew: Math.round((random() * 2 - 1) * 12) / 10 };
+  // Posición del adorno: en el centro del borde superior o, en fotos y fichas, en una esquina (no tapa la imagen).
+  const kind = TABLES.pin.get(pin)?.kind;
+  const corner = ["photo", "entity"].includes(item.type);
+  const side = random() < 0.5 ? -1 : 1;
+  const jitter = (n) => Math.round((random() * 2 - 1) * n);
+  return {
+    rot,
+    mask,
+    pin,
+    pinFx: corner ? (side < 0 ? 0.13 : 0.87) : 0.5,
+    pinX: jitter(corner ? 5 : 14),
+    pinRot: corner && kind === "cinta" ? side * (36 + Math.abs(jitter(10))) : jitter(kind === "chincheta" ? 6 : 12),
+    skew: jitter(12) / 10,
+  };
 }
 
 /* ---------------------------------- Validación ---------------------------------- */

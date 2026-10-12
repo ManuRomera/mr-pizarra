@@ -179,6 +179,17 @@ function documentOptions() {
   ].join("");
 }
 
+/** Reduce el texto de una pieza hasta que cabe en su zona segura. */
+function fitText(el) {
+  for (const box of el.querySelectorAll(".mrp-text")) {
+    let size = 1;
+    while ((box.scrollHeight > box.clientHeight + 1 || box.scrollWidth > box.clientWidth + 1) && size > 0.45) {
+      size -= 0.05;
+      box.style.fontSize = `${size.toFixed(2)}em`;
+    }
+  }
+}
+
 /* -------------------------------- La hoja -------------------------------- */
 
 export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
@@ -200,6 +211,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
   #first = true;
   #root = null;
   #saveTimer = null;
+  #trash = [];
 
   constructor(options = {}) {
     const saved = stored(`win.${options.document?.id}`, {});
@@ -267,7 +279,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
 
   #build(content) {
     const tool = (name, icon, label) => `<button type="button" data-tool="${name}" title="${label}" aria-label="${label}"><i class="${icon}"></i></button>`;
-    content.innerHTML = `<div class="mrp-root">
+    content.innerHTML = `<div class="mrp-root" tabindex="-1">
       <nav class="mrp-tools" aria-label="${t("title")}">
         ${tool("note", "fa-solid fa-note-sticky", t("note"))}${tool("clipping", "fa-regular fa-newspaper", t("clipping"))}${tool("photo", "fa-regular fa-image", t("photo"))}
         ${tool("doc", "fa-regular fa-file-lines", t("journal"))}${tool("stamp", "fa-solid fa-stamp", t("stamp"))}${tool("mark", "fa-solid fa-pen-nib", t("mark"))}
@@ -356,8 +368,8 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     const surface = this.#root.querySelector(".mrp-surface");
     const bg = TABLES.background.get(board.background) ?? BACKGROUNDS[0];
     surface.style.backgroundImage = `url(${asset(bg.folder, bg.id)})`;
-    const tiled = MANIFEST[`fondos/${bg.id}`]?.tile;
-    surface.style.backgroundSize = tiled ? "1024px" : "cover";
+    const tiled = MANIFEST[`fondos/${bg.id}`]?.mode !== "cover" && bg.size;
+    surface.style.backgroundSize = tiled ? `${bg.size}px` : "cover";
     surface.style.backgroundRepeat = tiled ? "repeat" : "no-repeat";
     this.#root.classList.toggle("mrp-readonly", !this.canEdit);
     this.#root.querySelector("[data-tool=lock] i")?.setAttribute("class", `fa-solid ${board.locked ? "fa-lock" : "fa-lock-open"}`);
@@ -374,6 +386,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
       if (id === this.#selected) el.classList.add("mrp-selected");
       if (old) old.replaceWith(el);
       else container.append(el);
+      fitText(el);
       this.#sigs.set(id, sig);
     }
     for (const el of container.querySelectorAll(".mrp-item")) if (!seen.has(el.dataset.id)) el.remove();
@@ -407,8 +420,8 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     const w = el.offsetWidth;
     const h = el.offsetHeight;
     const rot = (Number(el.dataset.rot) * Math.PI) / 180;
-    const ox = Number(el.dataset.pinx);
-    const oy = -h / 2 + 10;
+    const ox = w * Number(el.dataset.fx) + Number(el.dataset.pinx) - w / 2;
+    const oy = Number(el.dataset.pint) - h / 2;
     return { x: el.offsetLeft + w / 2 + ox * Math.cos(rot) - oy * Math.sin(rot), y: el.offsetTop + h / 2 + ox * Math.sin(rot) + oy * Math.cos(rot) };
   }
 
@@ -442,6 +455,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
   #down(event) {
     if (event.button === 2) return;
     this.#closeMenu();
+    this.#root.focus({ preventScroll: true });
     const itemEl = event.target.closest(".mrp-item");
     const threadEl = event.target.closest(".mrp-thread");
     if (threadEl && !itemEl && event.button === 0) return this.#threadMenu(threadEl.dataset.link, event);
@@ -766,9 +780,26 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     this.#commit([{ op: "set", kind: "items", id: uid(), data: { ...item, x: item.x + 36, y: item.y + 36, z: top } }]);
   }
 
-  async #remove(id) {
-    const ok = await foundry.applications.api.DialogV2.confirm({ window: { title: t("remove") }, content: `<p>${t("deleteConfirm")}</p>`, rejectClose: false });
-    if (ok) this.#commit([{ op: "remove", kind: "items", id }]);
+  /** Quita una pieza (y sus hilos) sin preguntar; Ctrl/Cmd+Z la devuelve. */
+  #remove(id) {
+    const item = this.board.items[id];
+    if (!item) return;
+    const links = Object.entries(this.board.links ?? {}).filter(([, l]) => l.from === id || l.to === id).map(([linkId, l]) => ({ id: linkId, ...l }));
+    this.#trash.push({ id, item, links });
+    if (this.#trash.length > 25) this.#trash.shift();
+    this.#selected = null;
+    return this.#commit([{ op: "remove", kind: "items", id }]);
+  }
+
+  #undoRemove() {
+    const last = this.#trash.pop();
+    if (!last) return;
+    const { hidden, ...rest } = last.item;
+    const data = game.user.isGM ? last.item : rest;
+    return this.#commit([
+      { op: "set", kind: "items", id: last.id, data },
+      ...last.links.filter((l) => this.board.items[l.from] || l.from === last.id).map(({ id, ...link }) => ({ op: "set", kind: "links", id, data: link })),
+    ]);
   }
 
   #key(event) {
@@ -776,7 +807,12 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     if (event.key === "Escape") {
       this.#closeMenu();
       if (this.#threadMode) this.#tool("thread");
-    } else if ((event.key === "Delete" || event.key === "Backspace") && this.#selected && this.canEdit) this.#remove(this.#selected);
-    else if (event.key === "Enter" && event.target.classList.contains("mrp-item")) this.#activate(event.target.dataset.id);
+    } else if ((event.key === "Delete" || event.key === "Backspace") && this.#selected && this.canEdit) {
+      event.preventDefault();
+      this.#remove(this.#selected);
+    } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z" && this.canEdit) {
+      event.preventDefault();
+      this.#undoRemove();
+    } else if (event.key === "Enter" && event.target.classList.contains("mrp-item")) this.#activate(event.target.dataset.id);
   }
 }

@@ -15,7 +15,9 @@ Módulo de Foundry VTT (v13+, probado en 13.351) independiente del sistema. Id `
 
 ## Trampas (aprendidas probando)
 - `_replaceHTML` de una hoja V2 corre **antes** de insertar la ventana: no hay tamaño aún. La vista inicial se calcula con `ResizeObserver` en `_onRender`.
-- Los fondos del zip original vienen reflejados en espejo (simetría perfecta): solo el cuarto superior izquierdo es real. Las texturas finas van en mosaico mezclado, el resto extendido (`tile` en el manifiesto).
+- Los fondos del zip original vienen reflejados en espejo (simetría perfecta): solo el cuarto superior izquierdo es real. Tres modos en el manifiesto: `blend` (cuarto real con bordes mezclados), `mirror` (imagen completa, ya es mosaico) y `cover` (mapas). La escala en pantalla es `size` en `BACKGROUNDS` (rules.mjs).
+- El texto de recortes y documentos se coloca en la zona segura de su contorno (`manifest.safe` de `bordes/*`, calculada por `prepare-assets.py`) y se aparta del adorno; `fitText` encoge la letra hasta que cabe. `auto` solo elige contornos de `AUTO_MASKS` (los que dejan hueco).
+- Las chinchetas son solo la cabeza (de frente no se ve la aguja); en fotos y fichas el adorno va en una esquina para no tapar la imagen.
 - `filter` en `.mrp-lift` aísla el modo de mezcla: las manchas y marcas con `multiply` lo llevan en el `.mrp-item`, sin filtro.
 - No pisar la fuente de iconos (`<i class="fa-*">`) en el CSS propio.
 - Las piezas ocultas y privadas se filtran en el cliente: están en los datos del diario (quien abra la consola las ve). Para secretos de verdad, no colgarlos.

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { planOps, look, rng, TABLES, BACKGROUNDS, PAPERS, MASKS, PINS, FLAG } from "../scripts/rules.mjs";
+import { planOps, look, rng, TABLES, BACKGROUNDS, PAPERS, MASKS, PINS, FLAG, AUTO_MASKS } from "../scripts/rules.mjs";
 import { readFileSync, existsSync } from "node:fs";
 
 const GM = { isGM: true, userId: "gm0000000000" };
@@ -95,6 +95,10 @@ test("apariencia: determinista por id y distinta entre piezas", () => {
   assert.deepEqual(look(ID1, item), look(ID1, item));
   const masks = new Set(Array.from({ length: 40 }, (_, i) => look(`pieza${i}xxxxxxxxxxx`, item).mask));
   assert.ok(masks.size >= 5, `solo ${masks.size} máscaras distintas`);
+  assert.ok([...masks].every((m) => AUTO_MASKS.includes(m)));
+  const p = look("zzzzzzzzzzzzzzzz", { type: "photo" });
+  assert.ok(p.pinFx < 0.2 || p.pinFx > 0.8, "las fotos llevan el adorno en una esquina");
+  assert.equal(look(ID1, { type: "clipping" }).pinFx, 0.5);
   assert.equal(look(ID1, { type: "clipping", mask: "none", pin: "none", rot: 3 }).rot, 3);
   assert.equal(look(ID1, { type: "photo" }).mask, "none");
   const r = rng("x");
@@ -107,4 +111,6 @@ test("catálogo: ids únicos y cada imagen existe en assets (si ya se generaron)
   if (!existsSync(manifest)) return;
   const m = JSON.parse(readFileSync(manifest, "utf8"));
   for (const t of Object.values(TABLES)) for (const e of t.values()) assert.ok(m[`${e.folder}/${e.id}`], `falta ${e.folder}/${e.id}`);
+  for (const id of AUTO_MASKS) assert.ok(m[`bordes/${id}`].safe, `falta la zona segura de ${id}`);
+  for (const b of BACKGROUNDS) assert.ok(m[`fondos/${b.id}`].mode === "cover" || b.size > 0, `falta el tamaño de ${b.id}`);
 });

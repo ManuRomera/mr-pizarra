@@ -104,11 +104,11 @@
 .mrp-tag { margin-top: 0.4em; font: 600 0.9em "Courier New", monospace; text-transform: uppercase; color: #5a3d20; }
 
 /* ---------- Adornos ---------- */
-.mrp-pin { position: absolute; left: calc(50% + var(--pinx)); top: 0; width: max(22px, calc(var(--w) * var(--pins))); height: auto; pointer-events: none; z-index: 2; filter: drop-shadow(1px 3px 2px rgba(0, 0, 0, 0.5)); transform: translate(-50%, -50%) rotate(var(--pinr)); }
-.mrp-pin-chincheta { top: 4%; transform: translate(-50%, -62%) rotate(var(--pinr)); }
-.mrp-pin-clip { left: 28%; top: 0; transform: translate(-50%, -28%) rotate(var(--pinr)); }
-.mrp-pin-grapa { top: 3%; transform: translate(-50%, -50%) rotate(var(--pinr)); }
-.mrp-pin-alfiler { transform: translate(-50%, -50%) rotate(calc(var(--pinr) - 55deg)); }
+/* Centro del adorno en (--fx, --pint) de la pieza; el texto se aparta de él (ver items.mjs). */
+.mrp-pin { position: absolute; left: calc(var(--fx) * 100% + var(--pinx)); top: var(--pint); width: var(--pinw); height: auto; pointer-events: none; z-index: 2; transform: translate(-50%, -50%) rotate(var(--pinr)); }
+.mrp-pin-chincheta { filter: drop-shadow(2px 4px 2px rgba(0, 0, 0, 0.55)); }
+.mrp-pin-clip, .mrp-pin-grapa { filter: drop-shadow(1px 2px 1.5px rgba(0, 0, 0, 0.5)); }
+.mrp-pin-cinta { opacity: 0.94; filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.4)); }
 
 /* ---------- HUD, ayuda y menú ---------- */
 .mrp-hud { display: none; position: absolute; left: 56px; right: 12px; top: 10px; z-index: 6; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 9px; background: #000c; color: #fff; font-size: 13px; pointer-events: auto; }

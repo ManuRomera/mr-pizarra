@@ -1,5 +1,13 @@
 # Cambios
 
+## 0.1.1 · Ajustes tras la primera prueba
+
+- El texto de recortes y documentos ya cae dentro del papel: cada contorno tiene su zona segura medida y la letra se encoge hasta que cabe. El contorno automático solo elige los que dejan hueco.
+- Celo, clips y chinchetas se pegan sobre el papel siguiendo su borde rasgado y el texto se aparta de ellos. En fotos y fichas van en una esquina para no tapar la imagen.
+- Las chinchetas se ven de frente (solo la cabeza, sin aguja); los clips son más grandes. Se retira la chincheta negra, que salió dañada.
+- Fondos a su escala: los ladrillos, la madera y demás motivos ya no son gigantes (cada fondo tiene su tamaño).
+- **Suprimir** borra la pieza seleccionada (con sus hilos) sin preguntar y **Ctrl/Cmd+Z** la devuelve.
+
 ## 0.1.0 · Primera versión
 
 - Pizarra de investigación colaborativa en una ventana propia con lienzo de 3200×2000 que se desplaza y se acerca. Cada pizarra es un diario (JournalEntry), así que los permisos son los del diario y funciona en cualquier sistema.

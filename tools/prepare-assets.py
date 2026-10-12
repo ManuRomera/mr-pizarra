@@ -48,6 +48,51 @@ def hole(im):
     return [round(t / h * 100, 1), round((w - r) / w * 100, 1), round((h - b) / h * 100, 1), round(l / w * 100, 1)]
 
 
+def safe_rect(alpha, thr=128):
+    """Mayor rectángulo con ejes alineados contenido en la forma, como márgenes % (arriba, derecha, abajo, izquierda)."""
+    small = np.array(Image.fromarray(alpha).resize((128, 160), Image.BILINEAR)) > thr
+    h, w = small.shape
+    heights = np.zeros(w, int)
+    best = (0, 0, 0, 0, 0)
+    for y in range(h):
+        heights = np.where(small[y], heights + 1, 0)
+        stack = []
+        for x in range(w + 1):
+            cur = heights[x] if x < w else 0
+            start = x
+            while stack and stack[-1][1] >= cur:
+                sx, sh = stack.pop()
+                area = sh * (x - sx)
+                if area > best[0]:
+                    best = (area, sx, y - sh + 1, x - 1, y)
+                start = sx
+            stack.append((start, cur))
+    _, x1, y1, x2, y2 = best
+    return [round(y1 / h * 100, 1), round((w - 1 - x2) / w * 100, 1), round((h - 1 - y2) / h * 100, 1), round(x1 / w * 100, 1)]
+
+
+def top_edge(alpha, bins=24, thr=128):
+    """Altura (% desde arriba) a la que empieza el papel en cada tramo horizontal: el borde superior no es recto."""
+    small = np.array(Image.fromarray(alpha).resize((192, 240), Image.BILINEAR)) > thr
+    out = []
+    for chunk in np.array_split(np.arange(small.shape[1]), bins):
+        rows = np.where(small[:, chunk].any(1))[0]
+        out.append(round(float(rows[0]) / small.shape[0] * 100, 1) if len(rows) else 0.0)
+    return out
+
+
+def head_only(im):
+    """Chincheta de perfil → solo la cabeza (la aguja desaparece: de frente se ve la cabeza)."""
+    a = np.array(im.getchannel("A")) > 40
+    widths = a.sum(1)
+    top = int(np.argmax(widths > 0))
+    peak = int(np.argmax(widths))
+    cut = peak
+    while cut < len(widths) and widths[cut] > widths[peak] * 0.5:
+        cut += 1
+    return im.crop((0, top, im.width, min(im.height, cut + 4)))
+
+
 def largest_component(alpha, thr=24):
     """Máscara booleana de la mayor zona conectada (calculada en baja resolución y ampliada)."""
     small = np.array(Image.fromarray(alpha).resize((alpha.shape[1] // 4, alpha.shape[0] // 4), Image.BILINEAR)) > thr
@@ -78,9 +123,13 @@ def largest_component(alpha, thr=24):
     return np.array(keep) > 0
 
 
-# El generador hizo los fondos «sin costuras» reflejándolos (simetría especular): solo el cuarto superior izquierdo es textura real.
-# Texturas finas: mosaico de 1024 px con bordes mezclados. Rasgos grandes: ese cuarto extendido en una sola pieza.
-TILED = {"corcho-claro", "corcho-noir", "lienzo-yute", "moqueta-anos-80", "carton-archivo-policial", "pizarra-escolar-tiza"}
+# El generador hizo los fondos «sin costuras» reflejándolos (simetría especular), así que el original completo ya es
+# un mosaico válido (aunque con ejes de simetría) y solo su cuarto superior izquierdo es textura sin reflejar.
+#  - blend:  texturas finas → cuarto real, bordes mezclados (1024 px).
+#  - cover:  mapas → cuarto real, extendido en una pieza.
+#  - mirror: el resto → imagen completa reflejada (1536 px), se repite sin costuras a menor escala.
+BLEND = {"corcho-claro", "corcho-noir", "lienzo-yute", "moqueta-anos-80", "carton-archivo-policial", "pizarra-escolar-tiza"}
+COVER = {"mapa-antiguo-mundo", "pergamino-nautico"}
 
 
 def seamless(im):
@@ -96,10 +145,13 @@ def seamless(im):
 for f in sorted((src / "fondos").glob("*.jpg")):
     im = Image.open(f).convert("RGB")
     m = 28
-    quarter = im.crop((m, m, im.width // 2, im.height // 2)).resize((1024, 1024), Image.LANCZOS)
-    tiled = f.stem in TILED
-    save(seamless(quarter) if tiled else quarter, "fondos", f.name, 82, tile=tiled)
-    print("fondo", f.name, "mosaico" if tiled else "pieza")
+    if f.stem in BLEND:
+        save(seamless(im.crop((m, m, im.width // 2, im.height // 2)).resize((1024, 1024), Image.LANCZOS)), "fondos", f.name, 82, mode="blend")
+    elif f.stem in COVER:
+        save(im.crop((m, m, im.width // 2, im.height // 2)).resize((1024, 1024), Image.LANCZOS), "fondos", f.name, 82, mode="cover")
+    else:
+        save(im.crop((m, m, im.width - m, im.height - m)).resize((1536, 1536), Image.LANCZOS), "fondos", f.name, 80, mode="mirror")
+    print("fondo", f.name)
 
 for f in sorted((src / "recortes").glob("*.jpg")):
     save(Image.open(f).convert("RGB"), "recortes", f.name, 86)
@@ -110,7 +162,7 @@ for f in sorted((src / "bordes").glob("*.png")):
     alpha = np.where(keep, alpha, 0).astype(np.uint8)
     white = Image.new("RGBA", alpha.shape[::-1], (255, 255, 255, 0))
     white.putalpha(Image.fromarray(alpha))
-    save(white, "bordes", f.name, 90)
+    save(white, "bordes", f.name, 90, safe=safe_rect(alpha), top=top_edge(alpha))
 
 for f in sorted((src / "fotos").glob("*.png")):
     im = Image.open(f).convert("RGBA")
@@ -121,7 +173,10 @@ for f in sorted((src / "fotos").glob("*.png")):
     save(im, "fotos", f.name, 90, hole=hole(im))
 
 for f in sorted((src / "adornos").glob("*.png")):
-    save(crop_alpha(Image.open(f).convert("RGBA")), "adornos", f.name, 90)
+    pin = crop_alpha(Image.open(f).convert("RGBA"))
+    if f.stem.startswith("chincheta"):
+        pin = crop_alpha(head_only(pin))
+    save(pin, "adornos", f.name, 90)
 
 for f in sorted((src / "sellos").glob("*.png")):
     save(crop_alpha(Image.open(f).convert("RGBA"), 24), "sellos", f.name, 90)

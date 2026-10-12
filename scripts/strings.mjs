@@ -85,7 +85,6 @@ export const STR = {
   boardsOf: "Pizarras",
   convert: "Abrir como pizarra",
   convertDone: "Este diario ahora es una pizarra.",
-  deleteConfirm: "¿Quitar esta pieza de la pizarra?",
   groupMarker: "Rotulador",
   groupFingerprint: "Huellas",
   groupStains: "Manchas",
