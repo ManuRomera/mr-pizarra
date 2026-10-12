@@ -98,7 +98,7 @@
   "MRP.helpMove": "<b>Drag</b> any selected piece to move the whole group; arrow keys nudge 1 px (Shift: 10).",
   "MRP.helpScale": "The box <b>corners</b> scale the whole group; threads follow.",
   "MRP.helpRotate": "The <b>top circle</b> rotates the group (Shift: 15° steps).",
-  "MRP.helpPan": "<b>Wheel</b> zooms; <b>Space</b> or middle button + drag pans (or the Hand tool, H).",
+  "MRP.helpPan": "<b>Wheel</b> zooms; <b>Right button</b> on the background, <b>Space</b> or middle button + drag pans (or the Hand tool, H).",
   "MRP.helpDelete": "<b>Delete</b> removes the selection.",
   "MRP.helpUndo": "<b>Ctrl/Cmd+Z</b> undoes the last change.",
   "MRP.helpDuplicate": "<b>Ctrl/Cmd+D</b> duplicates the selection with its threads.",

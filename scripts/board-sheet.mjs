@@ -358,8 +358,8 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
         </header>
         <div class="mrp-viewport">
           <div class="mrp-world" style="width:${BOARD.width}px;height:${BOARD.height}px">
-            <div class="mrp-surface"></div><svg class="mrp-threads" width="${BOARD.width}" height="${BOARD.height}" aria-hidden="true"></svg>
-            <div class="mrp-items"></div>
+            <div class="mrp-surface"></div>
+            <div class="mrp-items"></div><svg class="mrp-threads" width="${BOARD.width}" height="${BOARD.height}" aria-hidden="true"></svg>
             <div class="mrp-sel" hidden><span class="mrp-h" data-h="nw"></span><span class="mrp-h" data-h="ne"></span><span class="mrp-h" data-h="se"></span><span class="mrp-h" data-h="sw"></span><span class="mrp-stem"></span><span class="mrp-h mrp-h-rot" data-h="rot"><i class="fa-solid fa-rotate"></i></span></div>
           </div>
           <div class="mrp-marquee" hidden></div>
@@ -741,7 +741,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
   /* ---------- interacción con el puntero ---------- */
 
   #down(event) {
-    if (event.button === 2) return;
+    if (event.button === 2 && event.target.closest(".mrp-item, .mrp-thread, .mrp-h, .mrp-menu, .mrp-flyout, .mrp-selbar, .mrp-zoombar, .mrp-minimap, .mrp-help, .mrp-hud")) return; // ahí el botón derecho abre el menú
     if (event.target.closest("[contenteditable=plaintext-only], [contenteditable=true]")) return;
     this.#closeMenu();
     this.#root.focus({ preventScroll: true });
@@ -749,11 +749,12 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     if (event.target.closest(".mrp-hud, .mrp-selbar, .mrp-zoombar, .mrp-help, .mrp-menu")) return;
     const handle = event.target.closest(".mrp-h");
     if (handle && this.canEdit) return this.#startTransform(event, handle.dataset.h);
-    const itemEl = event.target.closest(".mrp-item");
     const threadEl = event.target.closest(".mrp-thread");
-    const pan = event.button === 1 || this.#mode === "hand" || this.#space;
+    // los hilos van por delante de las piezas: si hay una pieza bajo el hilo, el clic es de la pieza
+    const itemEl = event.target.closest(".mrp-item") ?? (threadEl ? document.elementsFromPoint(event.clientX, event.clientY).find((el) => el.classList?.contains("mrp-item")) : null);
+    const pan = event.button === 1 || event.button === 2 || this.#mode === "hand" || this.#space;
     if (threadEl && !itemEl && event.button === 0 && !pan) return this.#threadMenu(threadEl.dataset.link, event);
-    if (pan) return this.#startPan(event);
+    if (pan) return this.#startPan(event, event.button === 0);
     if (itemEl) {
       const id = itemEl.dataset.id;
       if (this.#threadMode) return this.#threadPick(id);
@@ -788,7 +789,8 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
     event.preventDefault();
   }
 
-  #startPan(event) {
+  /** `clearOnClick`: un clic sin arrastrar deselecciona (no con el botón derecho ni el central). */
+  #startPan(event, clearOnClick = true) {
     const base = { x: this.#view.x, y: this.#view.y };
     this.#root.classList.add("mrp-panning");
     this.#track(event, (e, s) => {
@@ -797,7 +799,7 @@ export class BoardSheet extends foundry.applications.api.DocumentSheetV2 {
       this.#applyView();
     }, () => this.#root.classList.remove("mrp-panning"), () => {
       this.#root.classList.remove("mrp-panning");
-      if (!this.#threadMode) this.#select([]);
+      if (clearOnClick && !this.#threadMode) this.#select([]);
     });
   }
 

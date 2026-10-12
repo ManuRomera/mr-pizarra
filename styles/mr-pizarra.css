@@ -41,8 +41,8 @@
 .mrp-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; --ik: 1; }
 .mrp-surface { position: absolute; inset: 0; background-color: #7a5a3a; background-position: center;
   box-shadow: 0 0 0 14px #5b3d25, 0 0 0 17px #2a1b0e, 0 20px 70px 20px #000c, inset 0 0 120px #0008; }
-.mrp-threads { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
-.mrp-items { position: absolute; inset: 0; pointer-events: none; }
+.mrp-threads { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: visible; } /* por delante de las piezas */
+.mrp-items { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
 
 /* Selección: caja con asas */
 .mrp-sel { position: absolute; z-index: 99999; pointer-events: none; border: calc(1.6px * var(--ik)) dashed var(--brass-2); border-radius: calc(4px * var(--ik)); background: rgba(243, 201, 105, 0.05); transform-origin: 50% 50%; }
@@ -103,7 +103,7 @@
 /* ---------- Hilos ---------- */
 .mrp-thread-line { fill: none; stroke-width: 3.2; stroke-linecap: round; }
 .mrp-thread-shadow { fill: none; stroke: #000; stroke-opacity: 0.3; stroke-width: 3; stroke-linecap: round; filter: blur(2px); }
-.mrp-thread-hit { fill: none; stroke: transparent; stroke-width: 18; pointer-events: stroke; cursor: pointer; }
+.mrp-thread-hit { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: pointer; }
 .mrp-threading .mrp-thread-hit, .mrp-handmode .mrp-thread-hit { pointer-events: none; }
 .mrp-thread text { font: 700 15px "Courier New", monospace; fill: #fff; paint-order: stroke; stroke: #000; stroke-width: 4px; stroke-linejoin: round; }
 

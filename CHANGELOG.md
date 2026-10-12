@@ -1,5 +1,10 @@
 # Cambios
 
+## 0.3.1 · Vista con el botón derecho e hilos por delante
+
+- **Botón derecho mantenido sobre el fondo y arrastrar** mueve la vista. Sobre una pieza o un hilo, el botón derecho sigue abriendo su menú.
+- **Los hilos pasan por delante de las piezas**, de chincheta a chincheta, para que se vea bien la conexión. Si un hilo cruza una pieza, un clic ahí agarra la pieza; el hilo se edita por sus tramos libres.
+
 ## 0.3.0 · Edición directa, sujeciones a tu gusto y accesibilidad
 
 - **Escribir sobre la pieza:** doble clic y escribes directamente en notas, titulares, cuerpos, pies de foto y sellos (Intro o clic fuera confirma, Esc cancela). Las piezas nuevas nacen ya listas para escribir. La ventana completa queda para «Editar detalles…».

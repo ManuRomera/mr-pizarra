@@ -99,7 +99,7 @@ export const STR = {
   helpMove: "<b>Arrastra</b> cualquier pieza seleccionada para mover todo el grupo; las flechas lo mueven 1 px (Mayús: 10).",
   helpScale: "Las <b>esquinas</b> de la caja escalan el grupo entero; los hilos se adaptan.",
   helpRotate: "El <b>círculo superior</b> gira el grupo (Mayús: de 15° en 15°).",
-  helpPan: "<b>Rueda</b> acerca y aleja; <b>Espacio</b> o botón central + arrastrar mueve la vista (o la herramienta Mano, H).",
+  helpPan: "<b>Rueda</b> acerca y aleja; <b>Botón derecho</b> sobre el fondo, <b>Espacio</b> o botón central + arrastrar mueve la vista (o la herramienta Mano, H).",
   helpDelete: "<b>Suprimir</b> quita lo seleccionado.",
   helpUndo: "<b>Ctrl/Cmd+Z</b> deshace el último cambio.",
   helpDuplicate: "<b>Ctrl/Cmd+D</b> duplica la selección con sus hilos.",
