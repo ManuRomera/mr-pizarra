@@ -2,6 +2,8 @@
 
 ![Pizarra de investigación](assets/ui/banner.webp)
 
+[![Descargas](https://raw.githubusercontent.com/ManuRomera/ManuRomera/main/badges/descargas-flat/mr-pizarra.svg)](https://github.com/ManuRomera/mr-pizarra/releases)
+
 Una **pizarra de investigación colaborativa** para Foundry VTT. Funciona en **cualquier sistema** y ambientación: corcho, hilos de colores, fotos, notas, recortes de periódico de formas irregulares y los documentos de tus propios diarios colgados con sus permisos.
 
 > Versión 0.1.0 · Foundry VTT 13 · Idiomas: español e inglés
