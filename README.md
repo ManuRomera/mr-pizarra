@@ -2,7 +2,14 @@
 
 ![Pizarra de investigación](assets/ui/banner.webp)
 
-[![Descargas](https://raw.githubusercontent.com/ManuRomera/ManuRomera/main/badges/descargas-flat/mr-pizarra.svg)](https://github.com/ManuRomera/mr-pizarra/releases)
+<p align="center">
+  <a href="https://github.com/ManuRomera"><img alt="Manu Romera · Digital RPG Design" src="https://raw.githubusercontent.com/ManuRomera/ManuRomera/main/badges/mr-firma.svg" height="28"></a>
+  <a href="https://github.com/ManuRomera/mr-pizarra/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/ManuRomera/mr-pizarra?include_prereleases&style=for-the-badge&color=a0522d&label=release"></a>
+  <a href="https://foundryvtt.com"><img alt="Foundry VTT V13" src="https://img.shields.io/badge/Foundry%20VTT-V13-57d8c8?style=for-the-badge"></a>
+  <a href="https://github.com/ManuRomera/mr-pizarra/releases"><img alt="Downloads" src="https://raw.githubusercontent.com/ManuRomera/ManuRomera/main/badges/descargas/mr-pizarra.svg"></a>
+  <img alt="System agnostic" src="https://img.shields.io/badge/system-agnostic-2b3245?style=for-the-badge">
+  <a href="LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/license-MIT-2b3245?style=for-the-badge"></a>
+</p>
 
 Una **pizarra de investigación colaborativa** para Foundry VTT. Funciona en **cualquier sistema** y ambientación: corcho, hilos de colores, fotos, notas, recortes de periódico de formas irregulares y los documentos de tus propios diarios colgados con sus permisos.
 
